@@ -2,6 +2,18 @@
 // Handlers for interrupts and their default implementation
 ///////////////////////////////////////////////////////////////////////////////
 
+/*
+ * Exception handlers.
+ */
+void xPortPendSVHandler( void ) __attribute__ (( naked ));
+void xPortSysTickHandler( void );
+void vPortSVCHandler( void ) __attribute__ (( naked ));
+
+void NMI_handler()
+{
+    while(1);
+}
+
 void HARDFAULT_handler()
 {
     while(1);
@@ -17,6 +29,21 @@ void USAGEFAULT_handler()
     while(1);
 }
 
+void SVCALL_handler()
+{
+    vPortSVCHandler();
+}
+
+void PENDSV_handler()
+{
+    xPortPendSVHandler();
+}
+
+void SYSTICK_handler()
+{
+    xPortSysTickHandler();
+}
+
 void DUMMY_handler() 
 { 
     while(true); 
@@ -29,7 +56,7 @@ typedef void (*ptr_func_t)();
 // This array will be placed in ".vectors" section defined in linker script.
 __attribute__((section(".vectors"), used)) ptr_func_t __isr_vectors[] = {
     RESET_handler,
-    DUMMY_handler, // NMI
+    NMI_handler, // NMI
     HARDFAULT_handler,
     DUMMY_handler, // MEMMANAGE
     BUSFAULT_handler,
@@ -38,11 +65,11 @@ __attribute__((section(".vectors"), used)) ptr_func_t __isr_vectors[] = {
     DUMMY_handler,
     DUMMY_handler,
     DUMMY_handler,
-    DUMMY_handler, // SVCALL,
+    SVCALL_handler, // SVCALL,
     DUMMY_handler, // DEBUGMONITOR,
     DUMMY_handler,
-    DUMMY_handler, // PENDSV
-    DUMMY_handler,
+    PENDSV_handler, // PENDSV
+    SYSTICK_handler,
     DUMMY_handler, // GPIO Port A
     DUMMY_handler, // GPIO Port B
     DUMMY_handler, // GPIO Port C

@@ -26,10 +26,7 @@
 #define configMESSAGE_BUFFER_LENGTH_TYPE        size_t
 
 /* Memory allocation related definitions. */
-#define configSUPPORT_STATIC_ALLOCATION         1
-#define configSUPPORT_DYNAMIC_ALLOCATION        0
-/*#define configTOTAL_HEAP_SIZE                   unused*/
-/*#define configAPPLICATION_ALLOCATED_HEAP        unused*/
+#define configTOTAL_HEAP_SIZE                   10*1024
 
 /* Hook function related definitions. */
 #define configUSE_IDLE_HOOK                     0
@@ -54,9 +51,9 @@
 #define configTIMER_TASK_STACK_DEPTH            configMINIMAL_STACK_SIZE
 
 /* Interrupt nesting behaviour configuration. */
-#define configKERNEL_INTERRUPT_PRIORITY         0
-#define configMAX_SYSCALL_INTERRUPT_PRIORITY    0
-#define configMAX_API_CALL_INTERRUPT_PRIORITY   0
+#define configKERNEL_INTERRUPT_PRIORITY         15
+#define configMAX_SYSCALL_INTERRUPT_PRIORITY    15
+#define configMAX_API_CALL_INTERRUPT_PRIORITY   15
 
 /* Define to trap errors during development. */
 #define configASSERT(x) if( ( x ) == 0 ) while(1);

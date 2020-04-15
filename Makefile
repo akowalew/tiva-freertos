@@ -114,6 +114,7 @@ INCLUDES += \
 # Application modules
 SOURCES += \
 	$(SRC_DIR)/freertos/portable/GCC/CM4F/port.c \
+	$(SRC_DIR)/freertos/portable/MemMang/heap_1.c \
 	$(SRC_DIR)/freertos/croutine.c \
 	$(SRC_DIR)/freertos/event_group.c \
 	$(SRC_DIR)/freertos/list.c \
