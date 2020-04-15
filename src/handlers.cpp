@@ -2,74 +2,94 @@
 // Handlers for interrupts and their default implementation
 ///////////////////////////////////////////////////////////////////////////////
 
-/*
- * Exception handlers.
- */
-void xPortPendSVHandler( void ) __attribute__ (( naked ));
-void xPortSysTickHandler( void );
-void vPortSVCHandler( void ) __attribute__ (( naked ));
+//
+// Exception handlers from FreeRTOS
+//
 
-void NMI_handler()
+void xPortPendSVHandler();
+void xPortSysTickHandler();
+void vPortSVCHandler();
+
+//
+// Custom exception handlers
+//
+
+static void NMI_handler()
 {
     while(1);
 }
 
-void HARDFAULT_handler()
+extern "C" [[noreturn]] void get_registers_from_stack(const u32* fault_stack)
+{
+    const auto r0 = fault_stack[0]; static_cast<void>(r0);
+    const auto r1 = fault_stack[1]; static_cast<void>(r1); 
+    const auto r2 = fault_stack[2]; static_cast<void>(r2);
+    const auto r3 = fault_stack[3]; static_cast<void>(r3);
+
+    const auto r12 = fault_stack[4]; static_cast<void>(r12);
+    const auto lr = fault_stack[5]; static_cast<void>(lr);
+    const auto pc = fault_stack[6]; static_cast<void>(pc);
+    const auto psr = fault_stack[7]; static_cast<void>(psr);
+
+    /* When the following line is hit, the variables contain the register values. */
+    while(true);
+}
+
+static void __attribute__((naked)) HARDFAULT_handler()
+{
+    __asm volatile
+    (
+        " tst lr, #4                                                \n"
+        " ite eq                                                    \n"
+        " mrseq r0, msp                                             \n"
+        " mrsne r0, psp                                             \n"
+        " ldr r1, [r0, #24]                                         \n"
+        " ldr r2, handler2_address_const                            \n"
+        " bx r2                                                     \n"
+        " handler2_address_const: .word get_registers_from_stack    \n"
+    );
+}
+
+static void MEMMANAGEFAULT_handler()
 {
     while(1);
 }
 
-void BUSFAULT_handler()
+static void BUSFAULT_handler()
 {
     while(1);
 }
 
-void USAGEFAULT_handler()
+static void USAGEFAULT_handler()
 {
     while(1);
 }
 
-void SVCALL_handler()
-{
-    vPortSVCHandler();
-}
-
-void PENDSV_handler()
-{
-    xPortPendSVHandler();
-}
-
-void SYSTICK_handler()
-{
-    xPortSysTickHandler();
-}
-
-void DUMMY_handler() 
+static void DUMMY_handler() 
 { 
     while(true); 
 }
 
-// Helper typedef
-typedef void (*ptr_func_t)();
+// Helper typedef for interrupt handlers function
+using Handler = void(*)();
 
-// Vector table for handlers
-// This array will be placed in ".vectors" section defined in linker script.
-__attribute__((section(".vectors"), used)) ptr_func_t __isr_vectors[] = {
+// Vector table for interrupt handlers
+__attribute__((section(".vectors"), used)) Handler __isr_vectors[] = {
     RESET_handler,
     NMI_handler, // NMI
     HARDFAULT_handler,
-    DUMMY_handler, // MEMMANAGE
+    MEMMANAGEFAULT_handler, // MEMMANAGE
     BUSFAULT_handler,
     USAGEFAULT_handler,
     DUMMY_handler,
     DUMMY_handler,
     DUMMY_handler,
     DUMMY_handler,
-    SVCALL_handler, // SVCALL,
+    vPortSVCHandler, // SVCALL,
     DUMMY_handler, // DEBUGMONITOR,
     DUMMY_handler,
-    PENDSV_handler, // PENDSV
-    SYSTICK_handler,
+    xPortPendSVHandler, // PENDSV
+    xPortSysTickHandler,
     DUMMY_handler, // GPIO Port A
     DUMMY_handler, // GPIO Port B
     DUMMY_handler, // GPIO Port C
