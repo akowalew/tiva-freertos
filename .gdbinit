@@ -25,6 +25,18 @@ define reset
 	monitor reset init
 end
 
+define registers
+	info registers
+end
+
+define faultstat
+	x 0xE000ED28
+end
+
+define faultaddr
+	x 0xE000ED38
+end
+
 #
 # Session initialization
 #
