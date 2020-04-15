@@ -12,50 +12,61 @@
 #include "task.h"
 #include "semphr.h"
 
+#include "hw_sysctl.h"
+#include "hw_gpio.h"
+
+#include "utils.cpp"
+#include "gpio.cpp"
+#include "sysctl.cpp"
+
 #include "handlers.cpp"
 
-// Generic hook to be called, when CHECK(...) macro detects failure
-template<typename T>
-[[noreturn]] void check_failed(const char* file, const char* function, int line, T result)
-{
-	static_cast<void>(file);
-	static_cast<void>(function);
-	static_cast<void>(line);
-	static_cast<void>(result);
-
-	while(1);
-}
-
-//! Helper macro, hangs if specified condition is failed (=false)
-#define CHECK(x) if(const auto result = (x); !result) check_failed(__FILE__, __FUNCTION__, __LINE__, result)
-
-// Queue to be used between tx_task and rx_task
+// Queue to be used between reader and writer tasks
 static QueueHandle_t queue = NULL;
 
-// Reader task. Just receives data from the queue
+//
+// Reader task
+//
+
 static void rx_task([[maybe_unused]] void *params)
 {
 	while(true)
 	{
+		// Get message from writer
 		u32 recv_value;
 		CHECK(xQueueReceive(queue, &recv_value, portMAX_DELAY));
 		CHECK(recv_value == 100UL);
 
-		vTaskDelay(pdMS_TO_TICKS(1000));
+		// Flash the receive LED for a while
+		GPIOF->DATA[GREEN_LED_PIN] ^= GREEN_LED_PIN;
+		vTaskDelay(pdMS_TO_TICKS(100));
+		GPIOF->DATA[GREEN_LED_PIN] ^= GREEN_LED_PIN;
+		vTaskDelay(pdMS_TO_TICKS(100));
 	}
 
 	while(1);
 }
 
-// Writer task. Just sends data to the queue
+//
+// Writer task
+//
+
 static void tx_task([[maybe_unused]] void *params)
 {
 	auto nextwaketime = xTaskGetTickCount();
 
 	while(true)
 	{
+		// Keep fixed update rate
 		vTaskDelayUntil(&nextwaketime, pdMS_TO_TICKS(1000));
 
+		// Flash the transmit LED for a while
+		GPIOF->DATA[RED_LED_PIN] ^= RED_LED_PIN;
+		vTaskDelay(pdMS_TO_TICKS(100));
+		GPIOF->DATA[RED_LED_PIN] ^= RED_LED_PIN;
+		vTaskDelay(pdMS_TO_TICKS(100));
+
+		// Put message to the reader
 		const auto value = 100UL;
 		const auto tickstowait = 0U;
 		CHECK(xQueueSend(queue, &value, tickstowait));
@@ -68,6 +79,10 @@ static void tx_task([[maybe_unused]] void *params)
 
 int main()
 {
+	// Hardware initialization
+	sys_init();
+	gpio_init();
+
 	// Create queue to be used by tasks
 	const auto QUEUE_LENGTH = 1;
 	CHECK(queue = xQueueCreate(QUEUE_LENGTH, sizeof(u32)));

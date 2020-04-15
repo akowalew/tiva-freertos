@@ -86,6 +86,7 @@ LDFLAGS += -Wl,--gc-sections
 # Include directories
 CXXFLAGS += \
 	-I$(CONFIG_DIR) \
+	-I$(INCLUDE_DIR) \
 	-I$(INCLUDE_DIR)/freertos \
 	-I$(SRC_DIR)/freertos/portable/GCC/CM4F \
 
@@ -110,6 +111,8 @@ INCLUDES += \
 	$(INCLUDE_DIR)/freertos/stream_buffer.h \
 	$(INCLUDE_DIR)/freertos/task.h \
 	$(INCLUDE_DIR)/freertos/timers.h \
+	$(INCLUDE_DIR)/hw_gpio.h \
+	$(INCLUDE_DIR)/hw_sysctl.h \
 
 # Application modules
 SOURCES += \
@@ -137,6 +140,9 @@ DEPS += \
     $(SRC_DIR)/handlers.cpp \
     $(SRC_DIR)/stack.cpp \
     $(SRC_DIR)/types.cpp \
+    $(SRC_DIR)/utils.cpp \
+    $(SRC_DIR)/sysctl.cpp \
+    $(SRC_DIR)/gpio.cpp \
     $(SRC_DIR)/tm4c123gh6pm.ld \
     Makefile \
 
