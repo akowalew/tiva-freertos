@@ -55,17 +55,21 @@ static void cli_task([[maybe_unused]] void *params)
 {
 	auto nextwaketime = xTaskGetTickCount();
 
-	char string[32];
+	// Print some welcome string
+	uart_write("En taro Adun, Executor!\n");
+
+	// In loop, read some string and echo it back, flashing the LEDs
+	char rx_string[32];
 	while(true)
 	{
 		// Read command from UART until CarriageReturn happen
 		// Minicom uses that when ENTER key is hit.
 		// Size of string is reduced by one because we will add a NewLine then
-		auto rdcount = uart_read_until(string, sizeof(string)-1, '\r');
+		auto rx_count = uart_read_until(rx_string, sizeof(rx_string)-1, '\r');
 
 		// In place of (not-added) CR character, set NewLine character instead 
-		assert(rdcount < sizeof(string));
-		string[rdcount++] = '\n';
+		assert(rx_count < sizeof(rx_string));
+		rx_string[rx_count++] = '\n';
 
 		// Flash the receive LED for a while to signal, that we've got data
 		GPIOF->DATA[GREEN_LED_PIN] ^= GREEN_LED_PIN;
@@ -74,7 +78,7 @@ static void cli_task([[maybe_unused]] void *params)
 		vTaskDelay(pdMS_TO_TICKS(100));
 
 		// Echo back received data 
-		uart_write(string, rdcount);
+		uart_write(rx_string, rx_count);
 
 		// Flash the transmit LED for a while to signal, that we've sent data
 		GPIOF->DATA[RED_LED_PIN] ^= RED_LED_PIN;
