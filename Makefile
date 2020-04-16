@@ -114,6 +114,7 @@ INCLUDES += \
 	$(INCLUDE_DIR)/hw_sysctl.h \
 	$(INCLUDE_DIR)/hw_gpio.h \
 	$(INCLUDE_DIR)/hw_uart.h \
+	$(INCLUDE_DIR)/hw_hibernate.h \
 
 # Application modules
 SOURCES += \
@@ -137,8 +138,11 @@ DEPS += \
 	$(SOURCES) \
 	$(INCLUDES) \
 	$(CONFIGS) \
+	$(SRC_DIR)/cli.cpp \
     $(SRC_DIR)/gpio.cpp \
     $(SRC_DIR)/handlers.cpp \
+    $(SRC_DIR)/hibernate.cpp \
+    $(SRC_DIR)/leds.cpp \
     $(SRC_DIR)/nvic.cpp \
     $(SRC_DIR)/reset.cpp \
     $(SRC_DIR)/stack.cpp \
@@ -190,7 +194,7 @@ dump: $(PROJECT_ELF)
 
 # Write (flashing) binary file into MCU
 flash: $(PROJECT_BIN)
-	$(LM4FLASH) $(PROJECT_BIN)
+	$(LM4FLASH) $(PROJECT_BIN) -E -v
 
 # Start debug session with MCU
 debug: $(PROJECT_ELF)
