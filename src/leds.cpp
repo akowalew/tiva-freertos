@@ -1,0 +1,14 @@
+///////////////////////////////////////////////////////////////////////////////
+// On-board LED management
+///////////////////////////////////////////////////////////////////////////////
+
+void leds_flash(u8 leds)
+{
+	// Turn ON leds and wait a bit
+	GPIOF->DATA[leds] = 0xFF;
+	vTaskDelay(pdMS_TO_TICKS(50));
+
+	// Turn OFF leds and wait a bit
+	GPIOF->DATA[leds] = 0;
+	vTaskDelay(pdMS_TO_TICKS(50));
+}
