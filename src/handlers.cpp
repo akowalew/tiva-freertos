@@ -95,7 +95,7 @@ __attribute__((section(".vectors"), used)) Handler __isr_vectors[] = {
     DUMMY_handler, // GPIO Port C
     DUMMY_handler, // GPIO Port D
     DUMMY_handler, // GPIO Port E
-    DUMMY_handler, // UART0
+    UART0_handler, // UART0
     DUMMY_handler, // UART1
     DUMMY_handler, // SSI0
     DUMMY_handler, // I 2 C0
