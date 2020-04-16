@@ -40,3 +40,41 @@
 #else
 #define assert(x) if(!(x)) __builtin_unreachable();
 #endif
+
+//! Converts numerical value to string
+// Similar to stdlib's `itoa`, but does not add any '\0' char at the end
+// and writes data "from_back", instead of re-writing it at the begin of string
+char* to_digits_ascii(u32 value, char* buffer_end)
+{
+	// 1234567 / 10 = 123456
+	// 1234567 - 123456*10 = 7
+	// -------
+	// 123456 / 10 = 12345
+	// 123456 - 12345*10 = 6
+	// -------
+	// 12345 / 10 = 1234
+	// 12345 - 1234*10 = 5
+	// ...
+
+	// 7654321
+	//   ...
+	// 1234567
+
+	// 1000 / 10 = 100
+	// 1000 - 100*10 = 0
+	
+	auto buffer = buffer_end;
+
+	do {
+		// TODO: May be done more performant by lookup table!
+		const auto tmp = (value / 10);
+		const u8 digit = (value - tmp*10);
+		value = tmp;
+
+		assert(digit < 10);
+		*(--buffer) = digit + '0';
+	} 
+	while(value);
+
+	return buffer;
+}
