@@ -1,2 +1,8 @@
+# Output files
 build/
-openocd.log
+
+# Log file from OpenOCD debugger
+openocd.log*
+
+# objdump files
+dump*
