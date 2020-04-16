@@ -105,6 +105,8 @@ static_assert(offsetof(UART_Block, CC) == 0xFC8);
 // Global variables
 //
 
+static QueueHandle_t rx_queue = nullptr;
+
 static volatile const char* tx_string;
 static volatile const char* tx_string_end;
 static volatile TaskHandle_t tx_task;
@@ -118,6 +120,9 @@ void uart_init()
 	//
 	// Global data initialization
 	//
+
+	const auto rx_queue_size = 8;
+	CHECK(rx_queue = xQueueCreate(rx_queue_size, sizeof(char)));
 
 	tx_task = nullptr;
 	tx_string = nullptr;
@@ -166,8 +171,39 @@ void uart_init()
 	// Use system clock
 	UART0->CC = UART_CC_CS_SYSCLK;
 
-	// Enable high speed and transmitter
-	UART0->CTL = (UART_CTL_HSE | UART_CTL_TXE | UART_CTL_UARTEN);
+	// Clear any pending UART interrupts
+	UART0->ICR = 0xFFFFFFFF;
+
+	// Receive interrupts will be enabled always
+	// even if nobody is reading now
+	UART0->IM = UART_IM_RXIM;
+
+	// Enable transmitter, receiver and use high speed mode
+	UART0->CTL = (UART_CTL_HSE | UART_CTL_TXE | UART_CTL_RXE | UART_CTL_UARTEN);
+}
+
+u32 uart_read_until(char* string, u32 size, char delimiter)
+{
+	assert(string != nullptr);
+	assert(size > 0);
+
+	u32 i;
+	for(i = 0; i < size; ++i) {
+		// Obtain a received character from the queue - entering the Blocked state
+		// (so not consuming any processing time) to wait for a character 
+		// if one is not already available.
+		char c;
+		CHECK(xQueueReceive(rx_queue, &c, portMAX_DELAY));
+		if(c == delimiter) {
+			// We have reached delimiter, we have to stop further reading
+			break;
+		}
+
+		// Store read char in destination string
+		string[i] = c;
+	}
+
+	return i;
 }
 
 void uart_write(const char* string, u32 size)
@@ -225,6 +261,8 @@ void uart_write(char const (&data)[N])
 
 void UART0_handler()
 {
+	// We need to know, if some of the operations done here may 
+	// unblock task with higher priority.
 	auto highpriotask_woken = pdFALSE;
 
 	// Latch status of occured UART interrupts
@@ -238,6 +276,7 @@ void UART0_handler()
 		{
 			// There is still some string to send. 
 			// Put next char and advance string pointer
+			// Interrupt cause will be automatically cleared
 			UART0->DR = *string;
 		}
 		else
@@ -257,7 +296,18 @@ void UART0_handler()
 	// Handle Rx interrupt if there is any
 	if(masked_status & UART_MIS_RXMIS)
 	{
-		assert(!"Not supported yet");
+		// Retrieve read character thus clearing interrupt cause
+		const auto c = UART0->DR;
+
+		// Send the character to the queue.
+		// If writing to the queue unblocks a task, and the unblocked task has a
+		// priority above the currently running task (the task that this interrupt
+		// interrupted), then highpriotask_woken will be set to pdTRUE inside the
+		// xQueueSendFromISR() function. highpriotask_woken is then passed to
+		// portYIELD_FROM_ISR() at the end of this interrupt handler to request a
+		// context switch so the interrupt returns directly to the (higher priority)
+		// unblocked task.
+		xQueueSendFromISR(rx_queue, &c, &highpriotask_woken);
 	}
 
 	/* portYIELD_FROM_ISR() will request a context switch if executing this
