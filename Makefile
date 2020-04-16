@@ -111,8 +111,9 @@ INCLUDES += \
 	$(INCLUDE_DIR)/freertos/stream_buffer.h \
 	$(INCLUDE_DIR)/freertos/task.h \
 	$(INCLUDE_DIR)/freertos/timers.h \
-	$(INCLUDE_DIR)/hw_gpio.h \
 	$(INCLUDE_DIR)/hw_sysctl.h \
+	$(INCLUDE_DIR)/hw_gpio.h \
+	$(INCLUDE_DIR)/hw_uart.h \
 
 # Application modules
 SOURCES += \
@@ -136,14 +137,16 @@ DEPS += \
 	$(SOURCES) \
 	$(INCLUDES) \
 	$(CONFIGS) \
-    $(SRC_DIR)/reset.cpp \
-    $(SRC_DIR)/handlers.cpp \
-    $(SRC_DIR)/stack.cpp \
-    $(SRC_DIR)/types.cpp \
-    $(SRC_DIR)/utils.cpp \
-    $(SRC_DIR)/sysctl.cpp \
     $(SRC_DIR)/gpio.cpp \
+    $(SRC_DIR)/handlers.cpp \
+    $(SRC_DIR)/nvic.cpp \
+    $(SRC_DIR)/reset.cpp \
+    $(SRC_DIR)/stack.cpp \
+    $(SRC_DIR)/sysctl.cpp \
     $(SRC_DIR)/tm4c123gh6pm.ld \
+    $(SRC_DIR)/types.cpp \
+    $(SRC_DIR)/uart.cpp \
+    $(SRC_DIR)/utils.cpp \
     Makefile \
 
 # 
