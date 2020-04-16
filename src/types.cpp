@@ -15,5 +15,6 @@ using i64 = int64_t;
 // Helper definitions used when declaring hardware blocks
 #define RW 
 #define RO const
+#define WO
 #define W1C
 #define RW1C
