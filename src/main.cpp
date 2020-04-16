@@ -32,7 +32,7 @@
 // {
 // 	while(true)
 // 	{
-// 		// Get message from writer
+// 		// Get message from cli
 // 		u32 recv_value;
 // 		CHECK(xQueueReceive(queue, &recv_value, portMAX_DELAY));
 // 		CHECK(recv_value == 100UL);
@@ -48,23 +48,39 @@
 // }
 
 //
-// Writer task
+// Command Line Interface task
 //
 
-static void writer_task([[maybe_unused]] void *params)
+static void cli_task([[maybe_unused]] void *params)
 {
 	auto nextwaketime = xTaskGetTickCount();
 
+	char string[32];
 	while(true)
 	{
-		// Flash the transmit LED for a while
-		GPIOF->DATA[RED_LED_PIN] ^= RED_LED_PIN;
+		// Read command from UART until CarriageReturn happen
+		// Minicom uses that when ENTER key is hit.
+		// Size of string is reduced by one because we will add a NewLine then
+		auto rdcount = uart_read_until(string, sizeof(string)-1, '\r');
+
+		// In place of (not-added) CR character, set NewLine character instead 
+		assert(rdcount < sizeof(string));
+		string[rdcount++] = '\n';
+
+		// Flash the receive LED for a while to signal, that we've got data
+		GPIOF->DATA[GREEN_LED_PIN] ^= GREEN_LED_PIN;
 		vTaskDelay(pdMS_TO_TICKS(100));
-		GPIOF->DATA[RED_LED_PIN] ^= RED_LED_PIN;
+		GPIOF->DATA[GREEN_LED_PIN] ^= GREEN_LED_PIN;
 		vTaskDelay(pdMS_TO_TICKS(100));
 
-		// Send some string through UART
-		uart_write("En taro Adun, Executor!\n");
+		// Echo back received data 
+		uart_write(string, rdcount);
+
+		// Flash the transmit LED for a while to signal, that we've sent data
+		GPIOF->DATA[RED_LED_PIN] ^= RED_LED_PIN;
+		vTaskDelay(pdMS_TO_TICKS(100));
+		GPIOF->DATA[RED_LED_PIN] ^= RED_LED_PIN;
+		vTaskDelay(pdMS_TO_TICKS(100));
 		
 		// Keep fixed update rate
 		vTaskDelayUntil(&nextwaketime, pdMS_TO_TICKS(1000));
@@ -86,11 +102,11 @@ int main()
 	uart_init();
 	nvic_init();
 
-	// Writer task
-	const auto writer_stacksize = configMINIMAL_STACK_SIZE;
-	const auto writer_params = nullptr;
-	const auto writer_priority = (tskIDLE_PRIORITY + 1);
-	CHECK(xTaskCreate(writer_task, "writer", writer_stacksize, writer_params, writer_priority, nullptr));
+	// Command Line Interface task
+	const auto cli_stacksize = configMINIMAL_STACK_SIZE;
+	const auto cli_params = nullptr;
+	const auto cli_priority = (tskIDLE_PRIORITY + 1);
+	CHECK(xTaskCreate(cli_task, "cli", cli_stacksize, cli_params, cli_priority, nullptr));
 
 	// // Receive task
 	// const auto rx_stacksize = configMINIMAL_STACK_SIZE;
