@@ -190,7 +190,7 @@ size: $(PROJECT_ELF)
 
 # Get object dump with source instructions
 dump: $(PROJECT_ELF)
-	$(OBJDUMP) -S -d $(PROJECT_ELF)
+	$(OBJDUMP) -S -d $(PROJECT_ELF) > dump
 
 # Write (flashing) binary file into MCU
 flash: $(PROJECT_BIN)
