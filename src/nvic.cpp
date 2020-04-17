@@ -139,7 +139,7 @@ void nvic_init()
 	// Enable particular interrupts and set their priorities
 	//
 
-	// NVIC->EN[INT_UART0 / 32] = (1 << (INT_UART0 % 32));
+	NVIC->EN[INT_UART0 / 32] = (1 << (INT_UART0 % 32));
 	NVIC->PRI[INT_UART0 / 4] = (0x5 << ((INT_UART0 % 4)*8 + 5));
 	NVIC->PRI[INT_GPIOF / 4] = (0x5 << ((INT_GPIOF % 4)*8 + 5));
 }
