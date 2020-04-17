@@ -176,7 +176,7 @@ void uart_init()
 
 	// Receive interrupts will be enabled always
 	// even if nobody is reading now
-	UART0->IM = UART_IM_RXIM;
+	UART0->IM = (UART_IM_RXIM | UART_IM_TXIM);
 
 	// Enable transmitter, receiver and use high speed mode
 	UART0->CTL = (UART_CTL_HSE | UART_CTL_TXE | UART_CTL_RXE | UART_CTL_UARTEN);
@@ -230,20 +230,16 @@ void uart_write(const char* string, u32 size)
 		{
 			assert(tx_task == nullptr);
 			assert(tx_string == tx_string_end);
-			assert(!(UART0->IM & UART_IM_TXIM));
 		}
 		NVIC_CRITICAL_SECTION_LEAVE(INT_UART0);
 	#endif
 
-	// Remember which task is sending the byte
+	// Remember which task is sending
 	tx_task = xTaskGetCurrentTaskHandle();
 
 	// Store the rest of the string to send
 	tx_string = (string);
 	tx_string_end = (string + size);
-
-	// Enable transmit interrupts. They will be disabled by ISR after write
-	UART0->IM |= (UART_IM_TXIM);
 
 	// Start string sending
 	// We are doing it right before going to sleep in order to reduce 
@@ -295,12 +291,12 @@ void UART0_handler()
 		}
 		else
 		{
-			// No more characters to send
-			// Disable Tx interrupts and notify transmit task, if it is waiting
-			assert(tx_task != nullptr);
-			UART0->IM &= ~UART_IM_TXIM;
-			vTaskNotifyGiveFromISR(tx_task, &highpriotask_woken);
+			// No more characters to send. Clear interrupt cause
+			UART0->ICR = UART_ICR_TXIC;
 
+			// Notify transmit task, if it is waiting
+			assert(tx_task != nullptr);
+			vTaskNotifyGiveFromISR(tx_task, &highpriotask_woken);
 			#ifndef NDEBUG
 				tx_task = nullptr;
 			#endif
