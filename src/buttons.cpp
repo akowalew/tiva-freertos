@@ -10,10 +10,10 @@
 static QueueHandle_t buttons_queue = nullptr;
 
 //
-// Public functions
+// Private functions
 //
 
-void buttons_task([[maybe_unused]] void* params)
+static void buttons_task([[maybe_unused]] void* params)
 {
 	while(true)
 	{
@@ -61,6 +61,10 @@ void buttons_task([[maybe_unused]] void* params)
 		}
 	}
 }
+
+//
+// Public functions
+//
 
 void buttons_init()
 {
