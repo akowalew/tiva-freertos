@@ -187,6 +187,11 @@ u32 uart_read_until(char* string, u32 size, char delimiter)
 	assert(string != nullptr);
 	assert(size > 0);
 
+	// Note there is no mutual exclusion at the driver level. If more than one
+	// task is using the serial port then mutual exclusion should be provided 
+	// where this function is called. 
+
+	// Perform read of the string
 	u32 i;
 	for(i = 0; i < size; ++i) {
 		// Obtain a received character from the queue - entering the Blocked state
@@ -203,6 +208,7 @@ u32 uart_read_until(char* string, u32 size, char delimiter)
 		string[i] = c;
 	}
 
+	// Return number of characters read
 	return i;
 }
 
@@ -211,33 +217,41 @@ void uart_write(const char* string, u32 size)
 	assert(string != nullptr);
 	assert(size > 0);
 
-	// Note there is no mutual exclusion at the driver level.  If more than one
+	// Note there is no mutual exclusion at the driver level. If more than one
 	// task is using the serial port then mutual exclusion should be provided 
 	// where this function is called. 
 
 	// Ensure notifications are not already waiting
 	ulTaskNotifyTake(pdTRUE, 0);
 
+	// Just to be sure, previous write must be done completely
+	#ifndef NDEBUG
+		NVIC_CRITICAL_SECTION_ENTER(INT_UART0);
+		{
+			assert(tx_task == nullptr);
+			assert(tx_string == tx_string_end);
+			assert(!(UART0->IM & UART_IM_TXIM));
+		}
+		NVIC_CRITICAL_SECTION_LEAVE(INT_UART0);
+	#endif
+
 	// Remember which task is sending the byte
-	assert(tx_task == nullptr);
 	tx_task = xTaskGetCurrentTaskHandle();
 
-	// Ensure that previous string was sent and TX interrupts are disabled
-	assert(tx_string == tx_string_end);
-	assert(!(UART0->IM & UART_IM_TXIM));
-
-	// Start string sending
-	UART0->DR = *string;
-
-	// Store rest of the string to send
+	// Store the rest of the string to send
 	tx_string = (string);
 	tx_string_end = (string + size);
 
-	// Enable the interrupt then wait for the byte to be sent.  
-	// The interrupt will be disabled again in the ISR.
-	UART0->IM |= UART_IM_TXIM;
-	const auto max_wait_time = pdMS_TO_TICKS(20UL * size);
-	ulTaskNotifyTake(pdTRUE, max_wait_time);
+	// Enable transmit interrupts. They will be disabled by ISR after write
+	UART0->IM |= (UART_IM_TXIM);
+
+	// Start string sending
+	// We are doing it right before going to sleep in order to reduce 
+	// amount of time between this write and further interrupt
+	UART0->DR = *string;
+
+	// Wait for string to be send
+	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 }
 
 // Overloaded version, handling strings with compile-time known size
