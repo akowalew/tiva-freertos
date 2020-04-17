@@ -151,6 +151,7 @@ DEPS += \
     $(SRC_DIR)/tm4c123gh6pm.ld \
     $(SRC_DIR)/types.cpp \
     $(SRC_DIR)/uart.cpp \
+    $(SRC_DIR)/ui.cpp \
     $(SRC_DIR)/utils.cpp \
     Makefile \
 

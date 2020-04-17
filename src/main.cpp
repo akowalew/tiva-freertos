@@ -28,6 +28,7 @@
 #include "buttons.cpp"
 
 #include "cli.cpp"
+#include "ui.cpp"
 
 #include "handlers.cpp"
 
@@ -51,6 +52,7 @@ int main()
 
 	// Software initialization
 	cli_init();
+	ui_init();
 
 	// Run kernel
 	vTaskStartScheduler();
