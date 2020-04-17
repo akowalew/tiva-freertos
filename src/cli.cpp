@@ -25,6 +25,10 @@ static void cli_task([[maybe_unused]] void *params)
 		// Signal that we've received data
 		leds_flash(GREEN_LED_PIN);
 
+		// Maybe some function, that receives rxbuffer and txbuffer, and returns
+		// some other txbuffer, which may be a subset of txbuffer or another, 
+		// e.g. formed from compile-time string? 
+
 		// Process received data
 		if((rx_count == 4) && (memcmp(rx_string, "time", 4) == 0))
 		{
@@ -38,6 +42,7 @@ static void cli_task([[maybe_unused]] void *params)
 			// and we would like to insert NewLine character to the end, so '-1'
 			const auto tx_string_end = (tx_string + sizeof(tx_string));
 			const auto tx_string_begin = to_digits_ascii(seconds, tx_string_end - 1);
+			assert(tx_string_begin >= tx_string);
 			*(tx_string_end - 1) = '\n';
 
 			// Write prepared string to UART
@@ -55,8 +60,8 @@ static void cli_task([[maybe_unused]] void *params)
 
 static void cli_init()
 {
-	const auto cli_stacksize = configMINIMAL_STACK_SIZE;
-	const auto cli_params = nullptr;
-	const auto cli_priority = (tskIDLE_PRIORITY + 1);
-	CHECK(xTaskCreate(cli_task, "cli", cli_stacksize, cli_params, cli_priority, nullptr));
+	const auto stacksize = configMINIMAL_STACK_SIZE;
+	const auto params = nullptr;
+	const auto priority = (tskIDLE_PRIORITY + 1);
+	CHECK(xTaskCreate(cli_task, "cli", stacksize, params, priority, nullptr));
 }
