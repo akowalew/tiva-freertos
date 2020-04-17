@@ -120,5 +120,5 @@ __attribute__((section(".vectors"), used)) Handler __isr_vectors[] = {
     DUMMY_handler, // Reserved
     DUMMY_handler, // System Control
     DUMMY_handler, // Flash
-    DUMMY_handler, // GPIOF
+    GPIOF_handler, // GPIOF
 };
