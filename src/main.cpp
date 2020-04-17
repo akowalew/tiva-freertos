@@ -19,12 +19,13 @@
 #include "hw_uart.h"
 #include "hw_hibernate.h"
 
+#include "nvic.cpp"
 #include "sysctl.cpp"
 #include "gpio.cpp"
 #include "uart.cpp"
 #include "hibernate.cpp"
 #include "leds.cpp"
-#include "nvic.cpp"
+#include "buttons.cpp"
 
 #include "cli.cpp"
 
@@ -45,6 +46,7 @@ int main()
 	gpio_init();
 	uart_init();
 	hib_init();
+	buttons_init();
 	nvic_init();
 
 	// Software initialization

@@ -138,6 +138,7 @@ DEPS += \
 	$(SOURCES) \
 	$(INCLUDES) \
 	$(CONFIGS) \
+	$(SRC_DIR)/buttons.cpp \
 	$(SRC_DIR)/cli.cpp \
     $(SRC_DIR)/gpio.cpp \
     $(SRC_DIR)/handlers.cpp \
