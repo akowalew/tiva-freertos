@@ -17,12 +17,14 @@
 #include "hw_sysctl.h"
 #include "hw_gpio.h"
 #include "hw_uart.h"
+#include "hw_i2c.h"
 #include "hw_hibernate.h"
 
 #include "nvic.cpp"
 #include "sysctl.cpp"
 #include "gpio.cpp"
 #include "uart.cpp"
+#include "i2c.cpp"
 #include "hibernate.cpp"
 #include "leds.cpp"
 #include "buttons.cpp"
@@ -46,6 +48,7 @@ int main()
 	sys_init();
 	gpio_init();
 	uart_init();
+	i2c_init();
 	hib_init();
 	buttons_init();
 	nvic_init();

@@ -99,7 +99,7 @@ __attribute__((section(".vectors"), used)) Handler __isr_vectors[] = {
     UART0_handler, // UART0
     DUMMY_handler, // UART1
     DUMMY_handler, // SSI0
-    DUMMY_handler, // I 2 C0
+    I2C0_handler, // I 2 C0
     DUMMY_handler, // PWM0 Fault
     DUMMY_handler, // PWM0 Generator 0
     DUMMY_handler, // PWM0 Generator 1

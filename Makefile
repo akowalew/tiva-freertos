@@ -53,12 +53,13 @@ endif
 # Used language standard
 CXXFLAGS += -std=gnu++17
 
-# Warnings options
-CXXFLAGS += -Wall
-CXXFLAGS += -Wextra
-CXXFLAGS += -pedantic
+# Warnings level
+CXXFLAGS += -Wall -Wextra -pedantic
 
-# Linkage options
+# Let the compilation be terminated after first error
+CXXFLAGS += -Wfatal-errors
+
+# Use fully bare-metal configuration
 CXXFLAGS += --specs=nano.specs
 
 # We don't like everything from C++...
@@ -76,7 +77,10 @@ CXXFLAGS += -nostartfiles
 # Linker options
 # 
 
+# Use our linker script
 LDFLAGS += -Wl,-T $(SRC_DIR)/tm4c123gh6pm.ld 
+
+# Garbage collect unused sections
 LDFLAGS += -Wl,--gc-sections
 
 # 
@@ -115,6 +119,7 @@ INCLUDES += \
 	$(INCLUDE_DIR)/hw_gpio.h \
 	$(INCLUDE_DIR)/hw_uart.h \
 	$(INCLUDE_DIR)/hw_hibernate.h \
+	$(INCLUDE_DIR)/hw_i2c.h \
 
 # Application modules
 SOURCES += \
@@ -143,6 +148,7 @@ DEPS += \
     $(SRC_DIR)/gpio.cpp \
     $(SRC_DIR)/handlers.cpp \
     $(SRC_DIR)/hibernate.cpp \
+    $(SRC_DIR)/i2c.cpp \
     $(SRC_DIR)/leds.cpp \
     $(SRC_DIR)/nvic.cpp \
     $(SRC_DIR)/reset.cpp \

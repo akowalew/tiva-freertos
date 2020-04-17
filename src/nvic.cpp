@@ -8,6 +8,9 @@ constexpr u32 VEC_GPIOC =       18;  constexpr u32 INT_GPIOC =       VEC_GPIOC-1
 constexpr u32 VEC_GPIOD =       19;  constexpr u32 INT_GPIOD =       VEC_GPIOD-16;
 constexpr u32 VEC_GPIOE =       20;  constexpr u32 INT_GPIOE =       VEC_GPIOE-16;
 constexpr u32 VEC_UART0 =       21;  constexpr u32 INT_UART0 =       VEC_UART0-16;
+constexpr u32 VEC_UART1 =       22;  constexpr u32 INT_UART1 =       VEC_UART1-16;
+constexpr u32 VEC_SSI0 =        23;  constexpr u32 INT_SSI0 =        VEC_SSI0-16;
+constexpr u32 VEC_I2C0 =        24;  constexpr u32 INT_I2C0 =        VEC_I2C0-16;
 constexpr u32 VEC_PWM0_FAULT =  25;  constexpr u32 INT_PWM0_FAULT =  VEC_PWM0_FAULT-16;
 constexpr u32 VEC_PWM0_0 =      26;  constexpr u32 INT_PWM0_0 =      VEC_PWM0_0-16;
 constexpr u32 VEC_PWM0_1 =      27;  constexpr u32 INT_PWM0_1 =      VEC_PWM0_1-16;
@@ -138,10 +141,13 @@ void nvic_init()
 	//
 	// Enable particular interrupts and set their priorities
 	//
-
+	
+	// TODO: What about INT_GPIOF?
 	NVIC->EN[INT_UART0 / 32] = (1 << (INT_UART0 % 32));
+	NVIC->EN[INT_I2C0 / 32] = (1 << (INT_I2C0 % 32));
 	NVIC->PRI[INT_UART0 / 4] = (0x5 << ((INT_UART0 % 4)*8 + 5));
 	NVIC->PRI[INT_GPIOF / 4] = (0x5 << ((INT_GPIOF % 4)*8 + 5));
+	NVIC->PRI[INT_I2C0 / 4] = (0x5 << ((INT_I2C0 % 4)*8 + 5));
 }
 
 void nvic_enable_int(u32 num)
