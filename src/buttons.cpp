@@ -2,6 +2,17 @@
 // Buttons management
 ///////////////////////////////////////////////////////////////////////////////
 
+//
+// Global variables
+//
+
+//! Queue to store buttons presses events
+static QueueHandle_t buttons_queue = nullptr;
+
+//
+// Public functions
+//
+
 void buttons_task([[maybe_unused]] void* params)
 {
 	while(true)
@@ -43,17 +54,34 @@ void buttons_task([[maybe_unused]] void* params)
 			}
 		}
 
-		// Do something. On any press turn LED ON, on none turn LED OFF
 		if(pressed_pins) {
-			GPIOF->DATA[BLUE_LED_PIN] ^= 0xFF;
+			// Send pressed pins to the queue
+			const auto tickstowait = 0U;
+			CHECK(xQueueSend(buttons_queue, &pressed_pins, tickstowait));
 		}
 	}
 }
 
 void buttons_init()
 {
+	// Create queue for button press events
+	const auto queue_size = 8;
+	CHECK(buttons_queue = xQueueCreate(queue_size, sizeof(u8)));
+
+	// Create task for buttons handling
 	const auto stacksize = configMINIMAL_STACK_SIZE;
 	const auto params = nullptr;
 	const auto priority = (tskIDLE_PRIORITY + 1);
 	CHECK(xTaskCreate(buttons_task, "buttons", stacksize, params, priority, nullptr));
+}
+
+u8 buttons_read()
+{
+	u8 pressed_pins;
+	// Read in blocking way press events from the queue
+	CHECK(xQueueReceive(buttons_queue, &pressed_pins, portMAX_DELAY));
+	CHECK(pressed_pins != 0x00);
+
+	// Return what buttons was pressed
+	return pressed_pins;
 }
