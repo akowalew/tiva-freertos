@@ -135,7 +135,31 @@ static_assert(offsetof(NVIC_Block, SWTRIG) == 0xF00);
 
 void nvic_init()
 {
+	//
 	// Enable particular interrupts and set their priorities
-	NVIC->EN[INT_UART0 / 32] |= (1 << (INT_UART0 % 32));
-	NVIC->PRI[INT_UART0 / 4] |= (0x5 << ((INT_UART0 % 4)*8 + 5));
+	//
+
+	// NVIC->EN[INT_UART0 / 32] = (1 << (INT_UART0 % 32));
+	NVIC->PRI[INT_UART0 / 4] = (0x5 << ((INT_UART0 % 4)*8 + 5));
+	NVIC->PRI[INT_GPIOF / 4] = (0x5 << ((INT_GPIOF % 4)*8 + 5));
 }
+
+void nvic_enable_int(u32 num)
+{
+	// EN* registers are write-1 sensitive. It means that we can
+	// without care set other bits to zero, because it does nothing with
+	// 0-written bits
+	NVIC->EN[num / 32] = (1 << (num % 32));
+}
+
+void nvic_disable_int(u32 num)
+{
+	// DIS* registers are write-1 sensitive. It means that we can
+	// without care set other bits to zero, because it does nothing with
+	// 0-written bits
+	NVIC->DIS[num / 32] = (1 << (num % 32));
+}
+
+#define NVIC_CRITICAL_SECTION_ENTER(num) nvic_disable_int((num))
+
+#define NVIC_CRITICAL_SECTION_LEAVE(num) nvic_enable_int((num))
