@@ -19,7 +19,8 @@ static void NMI_handler()
     while(1);
 }
 
-extern "C" [[noreturn]] void get_registers_from_stack(const u32* fault_stack)
+extern "C" __attribute__((used)) 
+[[noreturn]] void get_registers_from_stack(const u32* fault_stack)
 {
     const auto r0 = fault_stack[0]; static_cast<void>(r0);
     const auto r1 = fault_stack[1]; static_cast<void>(r1); 
