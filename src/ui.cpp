@@ -2,7 +2,11 @@
 // User Inteface module
 ///////////////////////////////////////////////////////////////////////////////
 
-void ui_task([[maybe_unused]] void* params)
+//
+// Private functions
+//
+
+static void ui_task([[maybe_unused]] void* params)
 {
 	// Read inputs
 	// Write outputs
@@ -20,6 +24,10 @@ void ui_task([[maybe_unused]] void* params)
 		GPIOF->DATA[BLUE_LED_PIN] ^= 0xFF;
 	}
 }
+
+//
+// Public functions
+//
 
 void ui_init()
 {
