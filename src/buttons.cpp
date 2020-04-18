@@ -21,6 +21,11 @@ static void buttons_task([[maybe_unused]] void* params)
 	buttons[0].pin = BTN_LEFT_PIN;
 	buttons[1].pin = BTN_RIGHT_PIN;
 
+	// Parameters of debouncing - suited for this board's buttons
+	constexpr u8 DEBOUNCE_INTERVAL_MS = 4;
+	constexpr u8 DEBOUNCE_REPEATS = 16;
+
+	// In loop either wait for any pin to be touched or perform debouncing
 	while(true)
 	{
 		// Wait for any pin to be touched
@@ -37,7 +42,7 @@ static void buttons_task([[maybe_unused]] void* params)
 				// Initialize them for debouncing
 				for(auto& button : buttons) {
 					if(next_debounce_pins & button.pin) {
-						button.timer = 16;
+						button.timer = DEBOUNCE_REPEATS;
 						button.counter = 0;
 					}
 				}
@@ -63,7 +68,8 @@ static void buttons_task([[maybe_unused]] void* params)
 
 				// If debouncing has finished, detect state of the pin
 				if(--timer == 0) {
-					if(counter < 16/4) {
+					if(counter < DEBOUNCE_REPEATS/4) {
+						// More than 75% of votes was for "is pressed"
 						pressed_pins |= pin;
 					}
 
@@ -91,7 +97,7 @@ static void buttons_task([[maybe_unused]] void* params)
 			}
 
 			// Wait for next interval
-			vTaskDelayUntil(&nextwaketime, pdMS_TO_TICKS(4));
+			vTaskDelayUntil(&nextwaketime, pdMS_TO_TICKS(DEBOUNCE_INTERVAL_MS));
 		}
 	}
 }

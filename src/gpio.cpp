@@ -273,7 +273,10 @@ constexpr u8 I2C0_PINS = (I2C0SCL_PIN | I2C0SDA_PIN);
 // Global variables
 //
 
+//! Queue to store detected touched pins
 static QueueHandle_t gpio_queue = nullptr;
+
+//! Handle to task, which is performing wait for pins interrupts
 static volatile TaskHandle_t gpio_wait_task = nullptr;
 
 //
@@ -359,6 +362,7 @@ void gpio_init()
 	GPIOF->IM = 0;
 }
 
+//! Retrieves (in non-blocking way), which pins caused interrupt
 u8 gpio_get()
 {
 	// Poll if there are any touched pins and return them
@@ -371,6 +375,7 @@ u8 gpio_get()
 	return touched_pins;
 }
 
+//! Enables interrupts for specified pins
 void gpio_enable(u8 pins)
 {
 	NVIC_CRITICAL_SECTION_ENTER(INT_GPIOF);
@@ -381,6 +386,7 @@ void gpio_enable(u8 pins)
 	NVIC_CRITICAL_SECTION_LEAVE(INT_GPIOF);
 }
 
+//! Enables interrupts for specified pins and waits for interrupt from any
 void gpio_wait(u8 pins)
 {
 	NVIC_CRITICAL_SECTION_ENTER(INT_GPIOF);
@@ -397,7 +403,7 @@ void gpio_wait(u8 pins)
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 }
 
-void GPIOF_handler()
+static void GPIOF_handler()
 {
 	auto highpriotask_woken = pdFALSE;
 	
