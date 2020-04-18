@@ -274,6 +274,7 @@ constexpr u8 I2C0_PINS = (I2C0SCL_PIN | I2C0SDA_PIN);
 //
 
 static QueueHandle_t gpio_queue = nullptr;
+static volatile TaskHandle_t gpio_wait_task = nullptr;
 
 //
 // Public functions
@@ -288,6 +289,7 @@ void gpio_init()
 
 	const auto gpio_queue_size = 8;
 	CHECK(gpio_queue = xQueueCreate(gpio_queue_size, sizeof(u8)));
+	gpio_wait_task = nullptr;
 
 	//
 	// Hardware initialization
@@ -357,7 +359,19 @@ void gpio_init()
 	GPIOF->IM = 0;
 }
 
-void gpio_listen(u8 pins)
+u8 gpio_get()
+{
+	// Poll if there are any touched pins and return them
+	u8 touched_pins;
+	if(!xQueueReceive(gpio_queue, &touched_pins, 0)) {
+		// Empty queue after timeout -> None of the pin was touched
+		return 0x00;
+	}
+
+	return touched_pins;
+}
+
+void gpio_enable(u8 pins)
 {
 	NVIC_CRITICAL_SECTION_ENTER(INT_GPIOF);
 	{
@@ -367,22 +381,20 @@ void gpio_listen(u8 pins)
 	NVIC_CRITICAL_SECTION_LEAVE(INT_GPIOF);
 }
 
-u8 gpio_read(TickType_t delay)
+void gpio_wait(u8 pins)
 {
-	// Poll if there are any touched pins and return them
-	u8 touched_pins;
-	if(!xQueueReceive(gpio_queue, &touched_pins, delay)) {
-		// Empty queue after timeout -> None of the pin was touched
-		return 0x00;
+	NVIC_CRITICAL_SECTION_ENTER(INT_GPIOF);
+	{
+		// Remember task which is waiting
+		gpio_wait_task = xTaskGetCurrentTaskHandle();
+
+		// Enable interrupts for specified pins
+		GPIOF->IM |= pins;
 	}
+	NVIC_CRITICAL_SECTION_LEAVE(INT_GPIOF);
 
-	return touched_pins;
-}
-
-u8 gpio_wait(u8 pins, TickType_t delay)
-{
-	gpio_listen(pins);
-	return gpio_read(delay);
+	// Wait for pins to be touched
+	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 }
 
 void GPIOF_handler()
@@ -397,6 +409,12 @@ void GPIOF_handler()
 
 		// Disable further interrupts for that pins
 		GPIOF->IM &= ~pins;
+
+		// If there is any task waiting for notification, wake it up
+		if(gpio_wait_task != nullptr) {
+			vTaskNotifyGiveFromISR(gpio_wait_task, &highpriotask_woken);
+			gpio_wait_task = nullptr;
+		}
 
 		// Send the touched pins to the queue.
 		// If writing to the queue unblocks a task, and the unblocked task has a

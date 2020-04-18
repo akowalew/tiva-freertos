@@ -24,20 +24,31 @@ static void buttons_task([[maybe_unused]] void* params)
 	while(true)
 	{
 		// Wait for any pin to be touched
-		auto debounce_pins = gpio_wait(BTNS_PINS, portMAX_DELAY);
-		for(auto& button : buttons) {
-			if(debounce_pins & button.pin) {
-				button.timer = 25;
-				button.counter = 0;
-			}
-		}
+		gpio_wait(BTNS_PINS);
 
 		// Some pins have been touched. Begin debouncing
 		auto nextwaketime = xTaskGetTickCount();
-		while(debounce_pins)
+		auto debounce_pins = 0x00;
+		while(true)
 		{
+			// Check, if some pins was touched recently
+			const auto next_debounce_pins = gpio_get();
+			if(next_debounce_pins) {
+				// Initialize them for debouncing
+				for(auto& button : buttons) {
+					if(next_debounce_pins & button.pin) {
+						button.timer = 16;
+						button.counter = 0;
+					}
+				}
+
+				debounce_pins |= next_debounce_pins;
+			}
+
+			// Latch state of pins
 			const auto pins_states = GPIOF->DATA[debounce_pins];
 
+			// Handle debouncing
 			auto finished_pins = 0x00;
 			auto pressed_pins = 0x00;
 			for(auto& [pin, timer, counter] : buttons) {
@@ -46,11 +57,13 @@ static void buttons_task([[maybe_unused]] void* params)
 					continue;
 				}
 
+				// Perform voting for "not_pressed"
 				const auto is_not_pressed = (pins_states & pin);
 				if(is_not_pressed) { ++counter; }
 
+				// If debouncing has finished, detect state of the pin
 				if(--timer == 0) {
-					if(counter < 25/4) {
+					if(counter < 16/4) {
 						pressed_pins |= pin;
 					}
 
@@ -58,27 +71,27 @@ static void buttons_task([[maybe_unused]] void* params)
 				}
 			}
 
+			// If there were detected pressed pins, send them to the queue
 			if(pressed_pins) {
 				CHECK(xQueueSend(buttons_queue, &pressed_pins, 0));
 			}
 
+			// Do we have some buttons, that have just end debouncing?
 			if(finished_pins) {
+				// Re-enable interrupts for them
+				gpio_enable(finished_pins);
+
+				// Exclude them from debouncing
 				debounce_pins &= ~finished_pins;
-				gpio_listen(finished_pins);
+				if(!debounce_pins)
+				{
+					// No more pins to debounce, we have to wait for interrupt! 
+					break;
+				}
 			}
 
 			// Wait for next interval
 			vTaskDelayUntil(&nextwaketime, pdMS_TO_TICKS(4));
-
-			const auto next_debounce_pins = gpio_read(0);
-			for(auto& button : buttons) {
-				if(next_debounce_pins & button.pin) {
-					button.timer = 25;
-					button.counter = 0;
-				}
-			}
-
-			debounce_pins |= next_debounce_pins;
 		}
 	}
 }
