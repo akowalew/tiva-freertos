@@ -13,49 +13,60 @@ static QueueHandle_t buttons_queue = nullptr;
 // Private functions
 //
 
+// 14452 14444 14312
+// 7400 7388
 static void buttons_task([[maybe_unused]] void* params)
 {
+	// We need some structure to represent buttons and theirs debouncing state
+	struct Button { u8 pin; u8 timer; u8 counter; } buttons[2];
+
+	// Initialize buttons to be in "not debouncing" state
+	buttons[0].pin = BTN_LEFT_PIN;
+	buttons[0].timer = 0;
+	buttons[1].pin = BTN_RIGHT_PIN;
+	buttons[1].timer = 0;
+
+	// In intervals check pins state and perform debouncing if needed
+	auto nextwaketime = xTaskGetTickCount();
 	while(true)
 	{
-		// Wait for any pin to be pressed
-		const auto touched_pins = gpio_wait(BTNS_PINS);
-		assert(touched_pins != 0x00);
-		assert((touched_pins & ~BTNS_PINS) == 0x00);
+		// Wait for next interval
+		vTaskDelayUntil(&nextwaketime, pdMS_TO_TICKS(4));
 
-		// Perform debouncing. Read pins 25 times in 4ms intervals
-		u8 pins_states[25]; 
-		auto nextwaketime = xTaskGetTickCount();
-		for(u8 i = 0; i < 25; ++i)
-		{
-			pins_states[i] = GPIOF->DATA[touched_pins];
-			vTaskDelayUntil(&nextwaketime, pdMS_TO_TICKS(4));
-		}
+		// Read state of the pins with the buttons
+		const auto pins_states = GPIOF->DATA[BTNS_PINS];
 
-		// Check buttons presses based on readed pins states 
+		// Check state of each pin and handle debouncing, if needed
 		u8 pressed_pins = 0x00;
-		for(u8 j = 0, mask = 0x01; j < 8; ++j, mask <<= 1) 
+		for(auto& [pin, timer, counter] : buttons)
 		{
-			if(!(touched_pins & mask)) {
-				// This is not any of touched pins, go to next 
-				continue;
-			}
+			// Check if pin is debouncing or is just pressed and needs one
+			const auto is_debouncing = (timer > 0);
+			const auto is_pressed = (!(pins_states & pin));
+			if(is_debouncing) 
+			{
+				// If button was pressed, it will have low-valued counter
+				if(is_pressed) { --counter; }
 
-			// Count hits for that pins
-			u16 counter = 0;
-			for(u8 i = 0; i < 25; ++i) {
-				counter += (u16)(pins_states[i] & mask);
+				// Check if debouncing is completed
+				if(--timer == 0)
+				{
+					// Perform voting to determine final state of the button
+					if(counter < 25/4) {
+						// Less than 25% of votes for "not pressed" => pressed
+						pressed_pins |= pin;
+					} 
+				}
 			}
-
-			// Determine, if button is pressed
-			counter >>= j;
-			if(counter < 25/4) {
-				// Buttons are active LOW, so we are counting 0's
-				pressed_pins |= mask;
+			else if(is_pressed) {
+				// Pin was just pressed. Start debouncing of it
+				counter = 25;
+				timer = 25;
 			}
 		}
 
+		// If we have any new pressed buttons, write them to the queue
 		if(pressed_pins) {
-			// Send pressed pins to the queue
 			const auto tickstowait = 0U;
 			CHECK(xQueueSend(buttons_queue, &pressed_pins, tickstowait));
 		}
