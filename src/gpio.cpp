@@ -273,7 +273,7 @@ constexpr u8 I2C0_PINS = (I2C0SCL_PIN | I2C0SDA_PIN);
 // Global variables
 //
 
-static QueueHandle_t gpio_queue = nullptr;
+static QueueHandle_t wait_queue = nullptr;
 
 //
 // Public functions
@@ -283,11 +283,11 @@ static QueueHandle_t gpio_queue = nullptr;
 void gpio_init()
 {
 	//
-	// Global data initialization
+	// Software initialization
 	//
 
-	const auto gpio_queue_size = 8;
-	CHECK(gpio_queue = xQueueCreate(gpio_queue_size, sizeof(u8)));
+	const auto wait_queue_size = 1;
+	CHECK(wait_queue = xQueueCreate(wait_queue_size, sizeof(u8)));
 
 	//
 	// Hardware initialization
@@ -359,39 +359,35 @@ void gpio_init()
 
 u8 gpio_wait(u8 pins)
 {
-	// We need an exclusive access to the IM register
-	NVIC_CRITICAL_SECTION_ENTER(INT_GPIOF);
-	{
-		// Enable interrupts for specified pins
-		// That way we clearly specify, for which pins we are waiting
-		GPIOF->IM = pins;
-	}
-	NVIC_CRITICAL_SECTION_LEAVE(INT_GPIOF);
+	// Just to be sure, previous wait must be done completely
+	#ifndef NDEBUG
+		NVIC_CRITICAL_SECTION_ENTER(INT_GPIOF);
+		{
+			assert(GPIOF->IM == 0x00);
+		}
+		NVIC_CRITICAL_SECTION_LEAVE(INT_GPIOF);
+	#endif
 
-	// Obtain touched pins from the queue - entering the Blocked state
+	// Enable interrupts for specified pins
+	GPIOF->IM = pins;
+
+	// Wait for interrupt to detect pins touch and return them
 	u8 touched_pins;
-	CHECK(xQueueReceive(gpio_queue, &touched_pins, portMAX_DELAY));
-
-	// There must be at least one touched pin
-	assert(touched_pins != 0x00);
-	// Touched pins must be a subset of `pins`
-	assert((touched_pins & ~pins) == 0x00);
-
-	// Return to the user, which pins of specified set was touched
+	CHECK(xQueueReceive(wait_queue, &touched_pins, portMAX_DELAY));
 	return touched_pins;
 }
 
 void GPIOF_handler()
 {
-	// Read, which pins caused interrupt
+	// Interrupt should come from touched pins
 	const auto pins = GPIOF->MIS;
 	assert(pins != 0x00);
 
-	// Disable further interrupts for that pins and clear spurious ones
-	GPIOF->IM &= ~pins;
-	GPIOF->ICR = pins;
+	// Disable further interrupts for any pins and clear spurious ones
+	GPIOF->IM = 0x00;
+	GPIOF->ICR = 0xFF;
 
-	// Send touched pins to the queue.
+	// Send the touched pins to the queue.
 	// If writing to the queue unblocks a task, and the unblocked task has a
 	// priority above the currently running task (the task that this interrupt
 	// interrupted), then highpriotask_woken will be set to pdTRUE inside the
@@ -400,7 +396,7 @@ void GPIOF_handler()
 	// context switch so the interrupt returns directly to the (higher priority)
 	// unblocked task.
 	auto highpriotask_woken = pdFALSE;
-	xQueueSendFromISR(gpio_queue, &pins, &highpriotask_woken);
+	xQueueSendFromISR(wait_queue, &pins, &highpriotask_woken);
 
 	/* portYIELD_FROM_ISR() will request a context switch if executing this
 	interrupt handler caused a task to leave the blocked state, and the task
