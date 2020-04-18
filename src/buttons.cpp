@@ -42,11 +42,11 @@ static void buttons_task([[maybe_unused]] void* params)
 		{
 			// Check if pin is debouncing or is just pressed and needs one
 			const auto is_debouncing = (timer > 0);
-			const auto is_pressed = (!(pins_states & pin));
+			const auto is_not_pressed = (pins_states & pin);
 			if(is_debouncing) 
 			{
 				// If button was pressed, it will have low-valued counter
-				if(is_pressed) { --counter; }
+				if(is_not_pressed) { ++counter; }
 
 				// Check if debouncing is completed
 				if(--timer == 0)
@@ -58,9 +58,9 @@ static void buttons_task([[maybe_unused]] void* params)
 					} 
 				}
 			}
-			else if(is_pressed) {
+			else if(!is_not_pressed) {
 				// Pin was just pressed. Start debouncing of it
-				counter = 25;
+				counter = 0;
 				timer = 25;
 			}
 		}
