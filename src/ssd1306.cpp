@@ -17,8 +17,8 @@ constexpr u8 SSD1306_ADDR = 0x3C;
 //   The GDDRAM column address pointer will be increased by one automatically 
 //   after each data write
 
-constexpr u8 CO_BIT = (1 << 7); // Continuation bit
-constexpr u8 DC_BIT = (1 << 6); // Data-Command selection bit
+constexpr u8 SSD1306_CO_BIT = (1 << 7); // Continuation bit
+constexpr u8 SSD1306_DC_BIT = (1 << 6); // Data-Command selection bit
 
 #define SSD1306_CHARGEPUMP_OFF 0x00
 #define SSD1306_CHARGEPUMP_ON 0x04
@@ -129,34 +129,10 @@ constexpr u8 DC_BIT = (1 << 6); // Data-Command selection bit
 
 #define SSD1306_NOP 0xE3
 
-#define SSD1306_CTRL_CMD CO_BIT
-#define SSD1306_CTRL_DATA (CO_BIT | DC_BIT)
-#define SSD1306_CTRL_LAST_CMDS 0x00
-#define SSD1306_CTRL_LAST_DATA (DC_BIT)
-
-// Preamble:
-// 	1: CTRL_CMD
-// 	2: SET_COLUMN_LOW(0)
-//  3: SET_CONTRAST() ???
-//  4: SET_INVERT() ???
-//
-// Page0:
-// 	0: CTRL_CMD
-//	1: SET_COLUMN_HIGH(0)
-//	2: CTRL_CMD
-//	3: SET_PAGE(0)
-//	4: CTRL_LAST_DATA
-//	5..n-1: ... <data> ...
-//
-// Page1:
-// 	0: CTRL_CMD
-//	1: SET_COLUMN_HIGH(0)
-//	2: CTRL_CMD
-//	3: SET_PAGE(1)
-//	4: CTRL_LAST_DATA
-//	5..n-1: ... <data> ...
-//
-// etc
+#define SSD1306_CTRL_ONE_CMD SSD1306_CO_BIT
+#define SSD1306_CTRL_ONE_DATA (SSD1306_CO_BIT | SSD1306_DC_BIT)
+#define SSD1306_CTRL_CMDS 0x00
+#define SSD1306_CTRL_DATA (SSD1306_DC_BIT)
 
 constexpr u8 SSD1306_RAMWIDTH = 132;
 constexpr u8 SSD1306_RAMHEIGHT = 64;
@@ -166,28 +142,10 @@ constexpr u8 SSD1306_ROWS = 64;
 constexpr u8 SSD1306_PAGES = (SSD1306_ROWS/8);
 
 //
-// Controls and commands headers for each display page 
-// They will be sent before sending each page in order to set proper
-// page and column numbers in display controller.
-// 
-constexpr u8 SSD1306_HEADER_SIZE = 7;
-constexpr u8 headers[SSD1306_PAGES][SSD1306_HEADER_SIZE] = {
-	{ SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_HIGH(0), SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_LOW(0), SSD1306_CTRL_CMD, SSD1306_SET_PAGE(0), SSD1306_CTRL_LAST_DATA },
-	{ SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_HIGH(0), SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_LOW(0), SSD1306_CTRL_CMD, SSD1306_SET_PAGE(1), SSD1306_CTRL_LAST_DATA },
-	{ SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_HIGH(0), SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_LOW(0), SSD1306_CTRL_CMD, SSD1306_SET_PAGE(2), SSD1306_CTRL_LAST_DATA },
-	{ SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_HIGH(0), SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_LOW(0), SSD1306_CTRL_CMD, SSD1306_SET_PAGE(3), SSD1306_CTRL_LAST_DATA },
-	{ SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_HIGH(0), SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_LOW(0), SSD1306_CTRL_CMD, SSD1306_SET_PAGE(4), SSD1306_CTRL_LAST_DATA },
-	{ SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_HIGH(0), SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_LOW(0), SSD1306_CTRL_CMD, SSD1306_SET_PAGE(5), SSD1306_CTRL_LAST_DATA },
-	{ SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_HIGH(0), SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_LOW(0), SSD1306_CTRL_CMD, SSD1306_SET_PAGE(6), SSD1306_CTRL_LAST_DATA },
-	{ SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_HIGH(0), SSD1306_CTRL_CMD, SSD1306_SET_COLUMN_LOW(0), SSD1306_CTRL_CMD, SSD1306_SET_PAGE(7), SSD1306_CTRL_LAST_DATA },
-};
-
-//
 // Display initialization commands
 //
 
-constexpr u8 ssd1306_initcmds[] = {
-	SSD1306_CTRL_LAST_CMDS,
+constexpr u8 SSD1306_INITDATA[] = {
 	SSD1306_SET_DISPLAY_OFF,
 	SSD1306_SET_COLUMN_LOW(0),
 	SSD1306_SET_START_LINE(0),
@@ -208,50 +166,69 @@ constexpr u8 ssd1306_initcmds[] = {
 };
 
 //
+// Headers with controls and commands for each display page 
+// Each header will be sent before corresponding page's data in order 
+// to set proper page and column numbers in display controller.
+//
+
+constexpr u8 SSD1306_HEADER_SIZE = 3;
+constexpr u8 SSD1306_HEADERS[SSD1306_PAGES][SSD1306_HEADER_SIZE] = {
+	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(0) },
+	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(1) },
+	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(2) },
+	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(3) },
+	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(4) },
+	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(5) },
+	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(6) },
+	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(7) },
+};
+
+//
 // Display buffer
 // It is organized as 8-bit pages, so writing e.g. 0xFF to some column causes
 // to turn ON 8 pixels in 8 next rows in given column.
 //
-u8 display[SSD1306_PAGES][SSD1306_COLS];
 
-// // 
-// // Display I2C buffers configuration 
-// // 
-// constexpr u8 SSD1306_BUFFERS_COUNT = 2;
-// constexpr Buffer buffers[SSD1306_BUFFERS_COUNT] = {
-// 	{&headers[0][0], SSD1306_HEADER_SIZE}, 
-// 	{&display[0][0], SSD1306_COLS}
-// };
+u8 ssd1306_data[SSD1306_PAGES][SSD1306_COLS];
 
 static void ssd1306_task([[maybe_unused]] void* params)
 {
 	// Initialize display
-	CHECK(i2c_write(ssd1306_initcmds, sizeof(ssd1306_initcmds), SSD1306_ADDR));
+	CHECK(i2c_write(SSD1306_INITDATA, sizeof(SSD1306_INITDATA), 
+		SSD1306_CTRL_CMDS, SSD1306_ADDR));
 
+	u8 byte = 0x00;
 	while(true)
 	{
-		// Do nothing
-		vTaskDelay(portMAX_DELAY);
+		// Update whole display
+		for(u8 i = 0; i < SSD1306_PAGES; ++i) {
+			// Write page header
+			CHECK(i2c_write(&SSD1306_HEADERS[i][0], sizeof(SSD1306_HEADERS[i]), 
+				SSD1306_CTRL_CMDS, SSD1306_ADDR));
+
+			// Write page data
+			CHECK(i2c_write(&ssd1306_data[i][0], sizeof(ssd1306_data[i]), 
+				SSD1306_CTRL_DATA, SSD1306_ADDR));
+		}
+
+		// Dummy invert whole memory to see if it is working
+		memset(ssd1306_data, byte, sizeof(ssd1306_data));
+		byte ^= 0xFF;
+
+		// Probably this loop is sooo low, so dummy request context switch
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
 }
 
 void ssd1306_init()
 {
+	memset(ssd1306_data, 0, sizeof(ssd1306_data));
+
 	const auto stacksize = configMINIMAL_STACK_SIZE;
 	const auto params = nullptr;
 	const auto priority = (tskIDLE_PRIORITY + 1);
 	CHECK(xTaskCreate(ssd1306_task, "ssd1306", stacksize, params, priority, nullptr));
 }
-
-// int ssd1306_write()
-// {
-// 	if(i2c_multiwrite(&buffers[0], SSD1306_BUFFERS_COUNT, SSD1306_PAGES, SSD1306_ADDR) == -1) {
-// 		uart_put("Could not write buffers to SSD1306\n");
-// 		return -1;
-// 	}
-
-// 	return 0;
-// }
 
 // void clear_display()
 // {
