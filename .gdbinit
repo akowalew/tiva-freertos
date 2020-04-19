@@ -9,15 +9,10 @@
 
 # `reload` command causes board to be reset and write ELF file to it 
 define reload
+	make
 	monitor reset halt
 	load
 	monitor reset init
-end
-
-# `rebuild` command first builds latest firmware, then loads is to the board
-define rebuild
-	make
-	reload
 end
 
 # `reset` command brings board to initial state without firmware reload
