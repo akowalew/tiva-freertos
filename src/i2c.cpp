@@ -83,7 +83,9 @@ static_assert(offsetof(I2C_Block, PC) == 0xFC4);
 // Global variables
 // 
 
-static volatile TaskHandle_t i2c_tx_task = nullptr;
+static volatile TaskHandle_t i2c_tx_task;
+static const volatile u8* i2c_tx_data;
+static const volatile u8* i2c_tx_dataend;
 
 //
 // Global functions
@@ -96,6 +98,8 @@ void i2c_init()
 	//
 
 	i2c_tx_task = nullptr;
+	i2c_tx_data = nullptr;
+	i2c_tx_dataend = nullptr;
 
 	//
 	// Hardware initialization
@@ -121,13 +125,53 @@ void i2c_init()
 	I2C0->MIMR = I2C_MIMR_IM;
 }
 
-bool i2c_write_one(u8 addr, u8 data)
+bool i2c_write_one(u8 data, u8 addr)
 {
 	// Just to be sure, previous write must be done
 	#ifndef NDEBUG
 		NVIC_CRITICAL_SECTION_ENTER(INT_I2C0);
 		{
 			assert(i2c_tx_task == nullptr);
+			assert(i2c_tx_data == i2c_tx_dataend);
+		}
+		NVIC_CRITICAL_SECTION_LEAVE(INT_I2C0);
+	#endif
+
+	// Master must be in idle mode
+	assert(I2C0->MCS & I2C_MCS_IDLE);
+
+	// Remember, which task will be waiting
+	i2c_tx_task = xTaskGetCurrentTaskHandle();
+
+	// Set slave address as transmit target
+	I2C0->MSA = I2C_WRITE_TO(addr);
+
+	// Set data to transmit and leave data pointer equal to each other
+	//  so when interrupt is hit, it will immediately quit and notify us
+	I2C0->MDR = data;
+	assert(i2c_tx_data == i2c_tx_dataend);
+
+	// Run I2C master, generate START and after send - generate STOP
+	I2C0->MCS = (I2C_MCS_RUN | I2C_MCS_START | I2C_MCS_STOP);
+
+	// Wait for notification from interrupt
+	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
+	// If ERROR flag is set, write failed
+	return (I2C0->MCS & I2C_MCS_ERROR) ? false : true;
+}
+
+bool i2c_write(const u8* data, u8 size, u8 addr)
+{
+	assert(data != nullptr);
+	assert(size > 1);
+
+	// Just to be sure, previous write must be done
+	#ifndef NDEBUG
+		NVIC_CRITICAL_SECTION_ENTER(INT_I2C0);
+		{
+			assert(i2c_tx_task == nullptr);
+			assert(i2c_tx_data == i2c_tx_dataend);
 		}
 		NVIC_CRITICAL_SECTION_LEAVE(INT_I2C0);
 	#endif
@@ -142,10 +186,12 @@ bool i2c_write_one(u8 addr, u8 data)
 	I2C0->MSA = I2C_WRITE_TO(addr);
 
 	// Set data to transmit
-	I2C0->MDR = data;
+	I2C0->MDR = *(data++);
+	i2c_tx_data = (data);
+	i2c_tx_dataend = (data + size);
 
-	// Run I2C master, generate START and after send - generate STOP
-	I2C0->MCS = (I2C_MCS_RUN | I2C_MCS_START | I2C_MCS_STOP);
+	// Begin transmission
+	I2C0->MCS = (I2C_MCS_RUN | I2C_MCS_START);
 
 	// Wait for notification from interrupt
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
@@ -165,16 +211,43 @@ static void I2C0_handler()
 	// Clear interrupt cause
 	I2C0->MICR = masked_status;
 
-	// 
+	// We will need to know, if higher priority task must be woken
 	auto highpriotask_woken = pdFALSE;
 
-	if(masked_status == I2C_MMIS_MIS) {
-		// Notify sending task that write has been done
-		assert(i2c_tx_task != nullptr);
-		vTaskNotifyGiveFromISR(i2c_tx_task, &highpriotask_woken);
-		#ifndef NDEBUG
-			i2c_tx_task = nullptr;
-		#endif
+	if(masked_status == I2C_MMIS_MIS) 
+	{
+		// Latch write context, because they are volatile variables
+		auto tx_data = i2c_tx_data;
+		const auto tx_dataend = i2c_tx_dataend;
+		assert(tx_data <= tx_dataend);
+
+		// Check if transmission is finished or error occured
+		// Note the data pointer may be both nullptrs, so then we are handling
+		// write_one case of transmission. In both cases above assertion works 
+		if((tx_data == tx_dataend) || (I2C0->MCS & I2C_MCS_ERROR)) {
+			// Notify sending task that write has been finished
+			//  (either with success or error - it will check)
+			assert(i2c_tx_task != nullptr);
+			vTaskNotifyGiveFromISR(i2c_tx_task, &highpriotask_woken);
+			#ifndef NDEBUG
+				i2c_tx_task = nullptr;
+			#endif
+		}
+		else {
+			// Put next data byte to the transmitter
+			assert(tx_data != nullptr);
+			I2C0->MDR = *(tx_data++);
+			if(tx_data == tx_dataend) {
+				// We are writing last data byte, after it stop transmission
+				I2C0->MCS = (I2C_MCS_RUN | I2C_MCS_STOP);
+			} else {
+				// We are writing some middle byte, run transmission as usual
+				I2C0->MCS = (I2C_MCS_RUN);
+			}
+
+			// Remember that we advanced to the next data byte
+			i2c_tx_data = tx_data;
+		}
 	}
 
 	/* portYIELD_FROM_ISR() will request a context switch if executing this
