@@ -41,6 +41,31 @@
 #define assert(x) if(!(x)) __builtin_unreachable();
 #endif
 
+//! Generic hook to be called, when assert(...) macro detects failure
+template<typename X, typename Y>
+[[noreturn]] void assert_equal_failed(const char* file, const char* function, int line, X x, Y y)
+{
+	// You should observe in debugger values of that variables
+	// and that way detect, where assertion was failed
+	static_cast<void>(file);
+	static_cast<void>(function);
+	static_cast<void>(line);
+	static_cast<void>(x);
+	static_cast<void>(y);
+
+	// Abort the program
+	while(1);
+}
+
+//! Simple assertion macro for testing equality, available only when NDEBUG is not present
+// In other case, it evaluates to __builtin_unreachable, optimization hint for compiler
+// Useful for checking pre- and post-conditions and invariants
+#ifndef NDEBUG
+#define assert_equal(x, y) if((x) != (y)) assert_equal_failed(__FILE__, __FUNCTION__, __LINE__, (x), (y))
+#else
+#define assert_equal(x, y) if((x) != (y)) __builtin_unreachable();
+#endif
+
 //! Converts numerical value to string
 // Similar to stdlib's `itoa`, but does not add any '\0' char at the end
 // and writes data "from_back", instead of re-writing it at the begin of string
