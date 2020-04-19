@@ -88,7 +88,7 @@ static const volatile u8* i2c_tx_data;
 static const volatile u8* i2c_tx_dataend;
 
 //
-// Global functions
+// Public functions
 //
 
 void i2c_init()
@@ -161,10 +161,14 @@ bool i2c_write_one(u8 data, u8 addr)
 	return (I2C0->MCS & I2C_MCS_ERROR) ? false : true;
 }
 
-bool i2c_write(const u8* data, u8 size, u8 addr)
+//! Multibyte write function with support for control byte
+// Control bytes are used e.g. in SSD1306, where we have to specify, if coming
+// bytes will contain commands or data for RAM. This function sends control byte
+// first, then sleeps and waits for write of the specified buffer
+bool i2c_write(const u8* data, u8 size, u8 ctrl, u8 addr)
 {
 	assert(data != nullptr);
-	assert(size > 1);
+	assert(size > 0);
 
 	// Just to be sure, previous write must be done
 	#ifndef NDEBUG
@@ -186,7 +190,7 @@ bool i2c_write(const u8* data, u8 size, u8 addr)
 	I2C0->MSA = I2C_WRITE_TO(addr);
 
 	// Set data to transmit
-	I2C0->MDR = *(data++);
+	I2C0->MDR = ctrl;
 	i2c_tx_data = (data);
 	i2c_tx_dataend = (data + size);
 
@@ -200,18 +204,22 @@ bool i2c_write(const u8* data, u8 size, u8 addr)
 	return (I2C0->MCS & I2C_MCS_ERROR) ? false : true;
 }
 
+//
+// Private functions
+//
+
 static void I2C0_handler()
 {
 	// Retrieve cause of the interrupt
 	const auto masked_status = I2C0->MMIS;
 
 	// NOTE: Sometimes there occurs interrupt with masked status = 0
-	//  At the moment I have no idea, why that happens, and what to do then
+	//  At the moment I have no idea, why that happens, and what to do with it
 
 	// Clear interrupt cause
 	I2C0->MICR = masked_status;
 
-	// We will need to know, if higher priority task must be woken
+	// We would like to know, if higher priority task must be woken
 	auto highpriotask_woken = pdFALSE;
 
 	if(masked_status == I2C_MMIS_MIS) 
@@ -224,16 +232,21 @@ static void I2C0_handler()
 		// Check if transmission is finished or error occured
 		// Note the data pointer may be both nullptrs, so then we are handling
 		// write_one case of transmission. In both cases above assertion works 
-		if((tx_data == tx_dataend) || (I2C0->MCS & I2C_MCS_ERROR)) {
+		const auto write_finished = (tx_data == tx_dataend);
+		const auto error_occured = (I2C0->MCS & I2C_MCS_ERROR);
+		if(write_finished || error_occured) 
+		{
 			// Notify sending task that write has been finished
 			//  (either with success or error - it will check)
-			assert(i2c_tx_task != nullptr);
-			vTaskNotifyGiveFromISR(i2c_tx_task, &highpriotask_woken);
+			const auto tx_task = i2c_tx_task;
+			assert(tx_task != nullptr);
+			vTaskNotifyGiveFromISR(tx_task, &highpriotask_woken);
 			#ifndef NDEBUG
 				i2c_tx_task = nullptr;
 			#endif
 		}
-		else {
+		else
+		{
 			// Put next data byte to the transmitter
 			assert(tx_data != nullptr);
 			I2C0->MDR = *(tx_data++);
