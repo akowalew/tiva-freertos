@@ -152,6 +152,7 @@ DEPS += \
     $(SRC_DIR)/leds.cpp \
     $(SRC_DIR)/nvic.cpp \
     $(SRC_DIR)/reset.cpp \
+    $(SRC_DIR)/ssd1306.cpp \
     $(SRC_DIR)/stack.cpp \
     $(SRC_DIR)/sysctl.cpp \
     $(SRC_DIR)/tm4c123gh6pm.ld \
