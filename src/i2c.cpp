@@ -159,20 +159,23 @@ static void I2C0_handler()
 	// Retrieve cause of the interrupt
 	const auto masked_status = I2C0->MMIS;
 
-	// At the moment we are only handling transmit-MIS flag,
-	// not including Clock-Timeout-Interrupts
-	assert_equal(masked_status, I2C_MMIS_MIS);
+	// NOTE: Sometimes there occurs interrupt with masked status = 0
+	//  At the moment I have no idea, why that happens, and what to do then
 
 	// Clear interrupt cause
 	I2C0->MICR = masked_status;
 
-	// Notify sending task that write has been done
+	// 
 	auto highpriotask_woken = pdFALSE;
-	assert(i2c_tx_task != nullptr);
-	vTaskNotifyGiveFromISR(i2c_tx_task, &highpriotask_woken);
-	#ifndef NDEBUG
-		i2c_tx_task = nullptr;
-	#endif
+
+	if(masked_status == I2C_MMIS_MIS) {
+		// Notify sending task that write has been done
+		assert(i2c_tx_task != nullptr);
+		vTaskNotifyGiveFromISR(i2c_tx_task, &highpriotask_woken);
+		#ifndef NDEBUG
+			i2c_tx_task = nullptr;
+		#endif
+	}
 
 	/* portYIELD_FROM_ISR() will request a context switch if executing this
 	interrupt handler caused a task to leave the blocked state, and the task
