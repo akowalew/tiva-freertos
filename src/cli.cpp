@@ -22,9 +22,6 @@ static void cli_task([[maybe_unused]] void *params)
 		// Minicom uses that when ENTER key is hit.
 		auto rx_count = uart_read_until(rx_string, sizeof(rx_string), '\r');
 
-		// Signal that we've received data
-		leds_flash(GREEN_LED_PIN);
-
 		// Maybe some function, that receives rxbuffer and txbuffer, and returns
 		// some other txbuffer, which may be a subset of txbuffer or another, 
 		// e.g. formed from compile-time string? 
@@ -53,8 +50,8 @@ static void cli_task([[maybe_unused]] void *params)
 			uart_write("Invalid command\n");
 		}
 
-		// Signal that we've transmitted data
-		leds_flash(RED_LED_PIN);
+		// Signal that we've finished handling command
+		leds_flash(GREEN_LED_PIN);
 	} 
 }
 
