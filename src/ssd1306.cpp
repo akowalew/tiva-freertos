@@ -191,35 +191,6 @@ constexpr u8 SSD1306_HEADERS[SSD1306_PAGES][SSD1306_HEADER_SIZE] = {
 
 u8 ssd1306_data[SSD1306_PAGES][SSD1306_COLS];
 
-static void ssd1306_task([[maybe_unused]] void* params)
-{
-	// Initialize display
-	CHECK(i2c_write(SSD1306_INITDATA, sizeof(SSD1306_INITDATA), 
-		SSD1306_CTRL_CMDS, SSD1306_ADDR));
-
-	u8 byte = 0x00;
-	while(true)
-	{
-		// Update whole display
-		for(u8 i = 0; i < SSD1306_PAGES; ++i) {
-			// Write page header
-			CHECK(i2c_write(&SSD1306_HEADERS[i][0], sizeof(SSD1306_HEADERS[i]), 
-				SSD1306_CTRL_CMDS, SSD1306_ADDR));
-
-			// Write page data
-			CHECK(i2c_write(&ssd1306_data[i][0], sizeof(ssd1306_data[i]), 
-				SSD1306_CTRL_DATA, SSD1306_ADDR));
-		}
-
-		// Dummy invert whole memory to see if it is working
-		memset(ssd1306_data, byte, sizeof(ssd1306_data));
-		byte ^= 0xFF;
-
-		// Probably this loop is sooo low, so dummy request context switch
-		vTaskDelay(pdMS_TO_TICKS(1));
-	}
-}
-
 //
 // Public functions
 //
@@ -227,145 +198,30 @@ static void ssd1306_task([[maybe_unused]] void* params)
 void ssd1306_init()
 {
 	memset(ssd1306_data, 0, sizeof(ssd1306_data));
-
-	const auto stacksize = configMINIMAL_STACK_SIZE;
-	const auto params = nullptr;
-	const auto priority = (tskIDLE_PRIORITY + 1);
-	CHECK(xTaskCreate(ssd1306_task, "ssd1306", stacksize, params, priority, nullptr));
 }
 
-// void clear_display()
-// {
-// 	memset(display, 0x00, sizeof(display));
-// }
+void ssd1306_startup()
+{
+	// Initialize display
+	CHECK(i2c_write(SSD1306_INITDATA, sizeof(SSD1306_INITDATA), 
+		SSD1306_CTRL_CMDS, SSD1306_ADDR));
+}
 
-// void draw_hline(u8 x1, u8 y1, u8 x2)
-// {
-// 	assert(x1 <= x2);
-// 	assert(x2 < SSD1306_COLS);
-// 	assert(y1 < SSD1306_ROWS);
+void ssd1306_write()
+{
+	// Update whole display
+	for(u8 i = 0; i < SSD1306_PAGES; ++i) {
+		// Write page header
+		CHECK(i2c_write(&SSD1306_HEADERS[i][0], sizeof(SSD1306_HEADERS[i]), 
+			SSD1306_CTRL_CMDS, SSD1306_ADDR));
 
-// 	const u8 page = (u8)(y1 >> 3);
-// 	const u8 bit = (u8)(y1 & 0x07);
-// 	const u8 mask = (u8)(1 << bit);
+		// Write page data
+		CHECK(i2c_write(&ssd1306_data[i][0], sizeof(ssd1306_data[i]), 
+			SSD1306_CTRL_DATA, SSD1306_ADDR));
+	}
+}
 
-// 	for(u8 x = x1; x <= x2; ++x) {
-// 		display[page][x] |= mask;
-// 	}
-// }
-
-// // ...
-// // 0
-// // 1
-// // 1
-// // ============
-// // 1
-// // 1
-// // 1
-// // 1
-// // 1
-// // 1
-// // 1
-// // 1
-// // ============
-// // 1
-// // 1
-// // 0
-// // ...
-
-// u8 getmask(u8 bit_from, u8 bit_to)
-// {
-// 	assert(bit_from <= bit_to);
-// 	assert(bit_to < 8);
-
-// 	constexpr u8 lut[8][8] = {
-// 	    //       0     1     2     3     4     5     6     7    <- bit2
-// 	    /* 0 */ 0x01, 0x03, 0x07, 0x0F, 0x1F, 0x3F, 0x7F, 0xFF,
-// 	    /* 1 */  0,   0x02, 0x06, 0x0E, 0x1E, 0x3E, 0x7E, 0xFE,
-// 	    /* 2 */  0,    0,   0x04, 0x0C, 0x1C, 0x3C, 0x7C, 0xFC,
-// 	    /* 3 */  0,    0,    0,   0x08, 0x18, 0x38, 0x78, 0xF8,
-// 	    /* 4 */  0,    0,    0,    0,   0x10, 0x30, 0x70, 0xF0,
-// 	    /* 5 */  0,    0,    0,    0,    0,   0x20, 0x60, 0xE0,
-// 	    /* 6 */  0,    0,    0,    0,    0,    0,   0x40, 0xC0,
-// 	    /* 7 */  0,    0,    0,    0,    0,    0,    0,   0x80,
-// 	    // ^
-// 	    // bit1
-// 	};
-
-// 	return lut[bit_from][bit_to];
-// }
-
-// void draw_vline(u8 x1, u8 y1, u8 y2)
-// {
-// 	assert(y1 <= y2);
-// 	assert(y2 < SSD1306_ROWS);
-// 	assert(x1 < SSD1306_COLS);
-
-// 	const u8 page1 = (u8)(y1 >> 3);
-// 	const u8 page2 = (u8)(y2 >> 3);
-// 	const u8 bit1 = (y1 & 0x07);
-// 	const u8 bit2 = (y2 & 0x07);
-
-// 	assert(page1 <= page2);
-// 	if(page1 == page2)
-// 	{
-// 		assert(bit1 <= bit2);
-// 		display[page1][x1] |= getmask(bit1, bit2);
-// 	}
-// 	else
-// 	{
-// 		display[page1][x1] |= getmask(bit1, 7);
-// 		for(u8 page = page1+1; page < page2; ++page)
-// 			display[page][x1] = 0xFF;
-// 		display[page2][x1] |= getmask(0, bit2);
-// 	}
-// }
-
-// void draw_rect(u8 x1, u8 y1, u8 x2, u8 y2)
-// {
-// 	draw_hline(x1, y1, x2);
-// 	draw_hline(x1, y2, x2);
-// 	draw_vline(x1, y1, y2);
-// 	draw_vline(x2, y1, y2);
-// }
-
-// struct crd_x {};
-// struct crd_y {};
-// struct dim_x {};
-// struct dim_y {};
-
-// void draw_rectf(u8 x1, u8 y1, u8 x2, u8 y2)
-// {
-// 	assert(x1 <= x2);
-// 	assert(y1 <= y2);
-// 	assert(y2 < SSD1306_ROWS);
-// 	assert(x2 < SSD1306_COLS);
-
-// 	const u8 page1 = (y1 >> 3);
-// 	const u8 page2 = (y2 >> 3);
-// 	const u8 bit1 = (y1 & 0x07);
-// 	const u8 bit2 = (y2 & 0x07);
-
-// 	assert(page1 <= page2);
-// 	if(page1 == page2)
-// 	{
-// 		assert(bit1 <= bit2);
-// 		const auto mask = getmask(bit1, bit2);
-// 		for(u8 x = x1; x <= x2; ++x)
-// 			display[page1][x] |= mask;
-// 	}
-// 	else
-// 	{
-// 		const auto mask1 = getmask(bit1, 7);
-// 		for(u8 x = x1; x <= x2; ++x)
-// 			display[page1][x] |= mask1;
-
-// 		const auto mask = 0xFF;
-// 		for(u8 page = page1+1; page < page2; ++page)
-// 			memset(&display[page][x1], mask, x2-x1+1);
-
-// 		const auto mask2 = getmask(0, bit2);
-// 		for(u8 x = x1; x <= x2; ++x)
-// 			display[page2][x] |= mask2;
-// 	}
-// }
+void ssd1306_clear()
+{
+	memset(ssd1306_data, 0x00, sizeof(ssd1306_data));
+}
