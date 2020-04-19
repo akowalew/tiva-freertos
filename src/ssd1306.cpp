@@ -220,6 +220,10 @@ static void ssd1306_task([[maybe_unused]] void* params)
 	}
 }
 
+//
+// Public functions
+//
+
 void ssd1306_init()
 {
 	memset(ssd1306_data, 0, sizeof(ssd1306_data));
