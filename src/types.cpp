@@ -18,3 +18,10 @@ using i64 = int64_t;
 #define WO
 #define W1C
 #define RW1C
+
+//! Generic buffer to store byte data
+struct Buffer
+{
+	const u8* data;
+	u8 size;
+};
