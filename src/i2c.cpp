@@ -83,7 +83,7 @@ static_assert(offsetof(I2C_Block, PC) == 0xFC4);
 // Global variables
 // 
 
-static volatile TaskHandle_t i2c_tx_task;
+static volatile TaskHandle_t i2c_tx_task = nullptr;
 
 //
 // Global functions
@@ -91,6 +91,16 @@ static volatile TaskHandle_t i2c_tx_task;
 
 void i2c_init()
 {
+	//
+	// Software initialization
+	//
+
+	i2c_tx_task = nullptr;
+
+	//
+	// Hardware initialization
+	//
+
 	// Initialize I2C Master
 	I2C0->MCR = I2C_MCR_MFE;
 
@@ -99,7 +109,7 @@ void i2c_init()
 	// of system clock periods in one SCL clock period:
 	constexpr u32 SCL_LP = 6; // SCL Low Period - fixed at 6
 	constexpr u32 SCL_HP = 4; // SCL High Period - fixed at 4
-	constexpr u32 SCL_CLK = 1000000; // Clock of I2C
+	constexpr u32 SCL_CLK = 100000; // Clock of I2C
 	constexpr u32 TPR = ((configCPU_CLOCK_HZ / (2 * (SCL_LP+SCL_HP) * SCL_CLK)) - 1);
 	static_assert(TPR > 0);
 	I2C0->MTPR = TPR;
@@ -107,28 +117,29 @@ void i2c_init()
 	// Clear any interrupt causes
 	I2C0->MICR = 0xFFFFFFFF;
 
-	// Enable interrupts
+	// Enable master interrupts
 	I2C0->MIMR = I2C_MIMR_IM;
 }
 
 bool i2c_write_one(u8 addr, u8 data)
 {
-	// Just to be sure, previous write must be done completely
+	// Just to be sure, previous write must be done
 	#ifndef NDEBUG
 		NVIC_CRITICAL_SECTION_ENTER(INT_I2C0);
 		{
 			assert(i2c_tx_task == nullptr);
-			assert(!(I2C0->MIMR & I2C_MIMR_IM));
-			assert(I2C0->MCS & I2C_MCS_IDLE);
 		}
 		NVIC_CRITICAL_SECTION_LEAVE(INT_I2C0);
 	#endif
 
-	// Remember which task is sending
+	// Master must be in idle mode
+	assert(I2C0->MCS & I2C_MCS_IDLE);
+
+	// Remember, which task will be waiting
 	i2c_tx_task = xTaskGetCurrentTaskHandle();
 
 	// Set slave address as transmit target
-	I2C0->MSA = I2C_WRITE_TO(addr << 1);
+	I2C0->MSA = I2C_WRITE_TO(addr);
 
 	// Set data to transmit
 	I2C0->MDR = data;
@@ -136,17 +147,11 @@ bool i2c_write_one(u8 addr, u8 data)
 	// Run I2C master, generate START and after send - generate STOP
 	I2C0->MCS = (I2C_MCS_RUN | I2C_MCS_START | I2C_MCS_STOP);
 
-	// Wait for data to be send
+	// Wait for notification from interrupt
 	ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 
-	// Check if there are any errors or we've lost an arbitration
-	if(I2C0->MCS & (I2C_MCS_ERROR | I2C_MCS_ARBLST)) {
-		// Write failed
-		return false;
-	} else {
-		// Write succeed
-		return true;
-	}
+	// If ERROR flag is set, write failed
+	return (I2C0->MCS & I2C_MCS_ERROR) ? false : true;
 }
 
 static void I2C0_handler()
@@ -156,10 +161,10 @@ static void I2C0_handler()
 
 	// At the moment we are only handling transmit-MIS flag,
 	// not including Clock-Timeout-Interrupts
-	assert(masked_status == I2C_MMIS_MIS);
+	assert_equal(masked_status, I2C_MMIS_MIS);
 
 	// Clear interrupt cause
-	I2C0->MICR = I2C_MICR_IC;
+	I2C0->MICR = masked_status;
 
 	// Notify sending task that write has been done
 	auto highpriotask_woken = pdFALSE;
