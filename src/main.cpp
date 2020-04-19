@@ -28,6 +28,7 @@
 #include "hibernate.cpp"
 #include "leds.cpp"
 #include "buttons.cpp"
+#include "chars.cpp"
 
 #include "cli.cpp"
 #include "ssd1306.cpp"
@@ -56,8 +57,8 @@ int main()
 
 	// Software initialization
 	cli_init();
-	ui_init();
 	ssd1306_init();
+	ui_init();
 
 	// Run kernel
 	vTaskStartScheduler();
