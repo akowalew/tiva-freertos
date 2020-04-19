@@ -26,8 +26,8 @@ constexpr u8 SSD1306_DC_BIT = (1 << 6); // Data-Command selection bit
 #define SSD1306_SET_CHARGEPUMP_OFF 0x8D, 0x10
 #define SSD1306_SET_CHARGEPUMP_ON 0x8D, 0x14
 
-#define SSD1306_SET_COLUMN_LOW(column) (column & 0x0F)
-#define SSD1306_SET_COLUMN_HIGH(column) (0x10 | (column >> 4))
+#define SSD1306_SET_COLUMN_LOW(column) (u8)(column & 0x0F)
+#define SSD1306_SET_COLUMN_HIGH(column) (u8)(0x10 | (column >> 4))
 #define SSD1306_SET_COLUMN(column) SSD1306_SET_COLUMN_HIGH(column), SSD1306_SET_COLUMN_LOW(column)
 
 #define SSD1306_PUMP_VOLTAGE_6_4V 0x00
@@ -142,86 +142,118 @@ constexpr u8 SSD1306_ROWS = 64;
 constexpr u8 SSD1306_PAGES = (SSD1306_ROWS/8);
 
 //
-// Display initialization commands
-//
-
-constexpr u8 SSD1306_INITDATA[] = {
-	SSD1306_SET_DISPLAY_OFF,
-	SSD1306_SET_COLUMN_LOW(0),
-	SSD1306_SET_START_LINE(0),
-	SSD1306_SET_CONTRAST(0x50),
-	SSD1306_SET_PUMP_VOLTAGE_7_4V,
-	SSD1306_SET_REMAP_REVERSE,
-	SSD1306_SET_ENTIREDISPLAY_OFF,
-	SSD1306_SET_INVERT_OFF,
-	SSD1306_SET_MUXRATIO(63),
-	SSD1306_SET_SCANDIR_REVERSE,
-	SSD1306_SET_OFFSET(0),
-	SSD1306_SET_CLKDIV_OSCFREQ(1, SSD1306_OSCFREQ_1_15_FOSC),
-	SSD1306_SET_CHARGEPERIOD(1, 15),
-	SSD1306_SET_PADSCONFIG_ALTERNATIVE,		
-	SSD1306_SET_VCOMDESEL_0_770,
-	SSD1306_SET_CHARGEPUMP_ON,
-	SSD1306_SET_DISPLAY_ON,
-};
-
-//
-// Headers with controls and commands for each display page 
-// Each header will be sent before corresponding page's data in order 
-// to set proper page and column numbers in display controller.
-//
-
-constexpr u8 SSD1306_HEADER_SIZE = 3;
-constexpr u8 SSD1306_HEADERS[SSD1306_PAGES][SSD1306_HEADER_SIZE] = {
-	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(0) },
-	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(1) },
-	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(2) },
-	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(3) },
-	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(4) },
-	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(5) },
-	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(6) },
-	{ SSD1306_SET_COLUMN_HIGH(0), SSD1306_SET_COLUMN_LOW(0), SSD1306_SET_PAGE(7) },
-};
-
-//
-// Display buffer
-// It is organized as 8-bit pages, so writing e.g. 0xFF to some column causes
-// to turn ON 8 pixels in 8 next rows in given column.
-//
-
-u8 ssd1306_data[SSD1306_PAGES][SSD1306_COLS];
-
-//
 // Public functions
 //
 
 void ssd1306_init()
 {
-	memset(ssd1306_data, 0, sizeof(ssd1306_data));
 }
 
-void ssd1306_startup()
+void ssd1306_write_cmds(const u8* cmds, u8 size)
 {
-	// Initialize display
-	CHECK(i2c_write(SSD1306_INITDATA, sizeof(SSD1306_INITDATA), 
-		SSD1306_CTRL_CMDS, SSD1306_ADDR));
+	CHECK(i2c_write(cmds, size, 
+		SSD1306_CTRL_CMDS, SSD1306_ADDR));	
 }
 
-void ssd1306_write()
+template<u8 N>
+void ssd1306_write_cmds(u8 const (&cmds)[N])
 {
-	// Update whole display
-	for(u8 i = 0; i < SSD1306_PAGES; ++i) {
-		// Write page header
-		CHECK(i2c_write(&SSD1306_HEADERS[i][0], sizeof(SSD1306_HEADERS[i]), 
-			SSD1306_CTRL_CMDS, SSD1306_ADDR));
+	ssd1306_write_cmds(cmds, N);
+}
 
-		// Write page data
-		CHECK(i2c_write(&ssd1306_data[i][0], sizeof(ssd1306_data[i]), 
-			SSD1306_CTRL_DATA, SSD1306_ADDR));
-	}
+void ssd1306_write_data(const u8* data, u8 size)
+{
+	CHECK(i2c_write(data, size, 
+		SSD1306_CTRL_DATA, SSD1306_ADDR));	
+}
+
+template<u8 N>
+void ssd1306_write_data(u8 const (&data)[N])
+{
+	ssd1306_write_data(data, N);
+}
+
+void ssd1306_setpos(u8 x, u8 page)
+{
+	assert(x < SSD1306_COLS);
+	assert(page < SSD1306_PAGES);
+
+	u8 cmds[] = {
+		SSD1306_SET_COLUMN_HIGH(x), 
+		SSD1306_SET_COLUMN_LOW(x), 
+		SSD1306_SET_PAGE(page)
+	};
+
+	ssd1306_write_cmds(cmds);
+}
+
+void ssd1306_setxy(u8 x, u8 y)
+{
+	assert(x < SSD1306_COLS);
+
+	const auto page = (y/8);
+	assert(page < SSD1306_PAGES);
+
+	u8 cmds[] = {
+		SSD1306_SET_COLUMN_HIGH(x), 
+		SSD1306_SET_COLUMN_LOW(x), 
+		SSD1306_SET_PAGE(page)
+	};
+
+	ssd1306_write_cmds(cmds);
 }
 
 void ssd1306_clear()
 {
-	memset(ssd1306_data, 0x00, sizeof(ssd1306_data));
+	u8 data[SSD1306_COLS] = { 0 };
+	// memset(ssd1306_data, 0x00, sizeof(ssd1306_data));
+	for(u8 page = 0; page < SSD1306_PAGES; ++page) {
+		ssd1306_setpos(0, page);
+		ssd1306_write_data(data);
+	}
+}
+
+void ssd1306_startup()
+{
+	// Display initialization commands
+	constexpr u8 SSD1306_INITDATA[] = {
+		SSD1306_SET_DISPLAY_OFF,
+		SSD1306_SET_COLUMN_LOW(0),
+		SSD1306_SET_START_LINE(0),
+		SSD1306_SET_CONTRAST(0x50),
+		SSD1306_SET_PUMP_VOLTAGE_7_4V,
+		SSD1306_SET_REMAP_REVERSE,
+		SSD1306_SET_ENTIREDISPLAY_OFF,
+		SSD1306_SET_INVERT_OFF,
+		SSD1306_SET_MUXRATIO(63),
+		SSD1306_SET_SCANDIR_REVERSE,
+		SSD1306_SET_OFFSET(0),
+		SSD1306_SET_CLKDIV_OSCFREQ(1, SSD1306_OSCFREQ_1_15_FOSC),
+		SSD1306_SET_CHARGEPERIOD(1, 15),
+		SSD1306_SET_PADSCONFIG_ALTERNATIVE,		
+		SSD1306_SET_VCOMDESEL_0_770,
+		SSD1306_SET_CHARGEPUMP_ON,
+		SSD1306_SET_DISPLAY_ON,
+	};
+
+	ssd1306_write_cmds(SSD1306_INITDATA);
+	ssd1306_clear();
+}
+
+void ssd1306_display_on()
+{
+	u8 cmds[] = {
+		SSD1306_SET_DISPLAY_ON
+	};
+
+	ssd1306_write_cmds(cmds);
+}
+
+void ssd1306_display_off()
+{
+	u8 cmds[] = {
+		SSD1306_SET_DISPLAY_OFF
+	};
+
+	ssd1306_write_cmds(cmds);
 }
